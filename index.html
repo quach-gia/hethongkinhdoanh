@@ -1104,10 +1104,12 @@ function syncDeleteFromSheet(type, ids){
 
 // LOAD data from Sheet → localStorage (fetch each type separately to avoid large response issues)
 function fetchSheetAction(url,action){
-    return fetch(url+'?action='+action,{redirect:'follow'}).then(r=>{
-        if(!r.ok)throw new Error('HTTP '+r.status);
+    return fetch(url+'?action='+action).then(r=>{
+        console.log('Fetch '+action+': status='+r.status+' ok='+r.ok+' type='+r.type+' url='+r.url);
         return r.text();
     }).then(txt=>{
+        console.log('Fetch '+action+' response length: '+txt.length);
+        if(!txt||txt.length<5){console.warn('Empty response for '+action);return{status:'error'}}
         try{return JSON.parse(txt)}catch(e){console.warn('JSON parse error for '+action+':',txt.substring(0,200));return{status:'error'}}
     });
 }
