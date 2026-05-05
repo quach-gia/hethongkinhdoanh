@@ -1175,29 +1175,28 @@ function initData(){
 // ========== AUTH ==========
 let currentUser=null;
 function doLogin(){
+    try{
     const u=document.getElementById('loginUser').value.trim().toLowerCase(),p=document.getElementById('loginPass').value;
+    if(!u||!p){document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Vui lòng nhập tên và mật khẩu!</div>';return}
     const users=gs(SK.users)||[];
     const user=users.find(x=>x.username===u&&x.password===p);
     if(user){currentUser=user;ss(SK.session,{username:user.username});showApp();return}
-    // If no local users, try loading from Sheet first
+    // Always try loading from Sheet if local login fails
     const url=getSheetUrl();
-    if(url&&users.length===0){
-        document.getElementById('loginAlert').innerHTML='<div class="alert" style="background:var(--warning);color:#000">Đang tải dữ liệu... ⏳</div>';
-        fetch(url+'?action=all').then(r=>r.json()).then(data=>{
-            if(data.status==='ok'){
-                if(data.users&&data.users.length)ss(SK.users,data.users);
-                if(data.expenses&&data.expenses.length)ss(SK.expenses,data.expenses);
-                if(data.revenues&&data.revenues.length)ss(SK.revenues,data.revenues);
-                if(data.shifts&&data.shifts.length)ss(SK.shifts,data.shifts);
-                if(data.topups&&data.topups.length)ss('qg_topups',data.topups);
-                const u2=(gs(SK.users)||[]).find(x=>x.username===u&&x.password===p);
+    if(url){
+        document.getElementById('loginAlert').innerHTML='<div class="alert" style="background:var(--warning);color:#000">Đang tải dữ liệu từ server... ⏳</div>';
+        fetch(url+'?action=users').then(r=>r.json()).then(data=>{
+            if(data.status==='ok'&&data.data&&data.data.length){
+                ss(SK.users,data.data);
+                const u2=data.data.find(x=>x.username===u&&x.password===p);
                 if(u2){currentUser=u2;ss(SK.session,{username:u2.username});showApp()}
-                else{document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Sai tên đăng nhập hoặc mật khẩu!</div>'}
-            }else{document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Lỗi kết nối server!</div>'}
+                else{document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Sai tên đăng nhập hoặc mật khẩu! 帳號或密碼錯誤</div>'}
+            }else{document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Sai tên đăng nhập hoặc mật khẩu!</div>'}
         }).catch(err=>{document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Không kết nối được server: '+err.message+'</div>'});
         return;
     }
     document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Sai tên đăng nhập hoặc mật khẩu!</div>';
+    }catch(err){document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Lỗi: '+err.message+'</div>'}
 }
 function doLogout(){currentUser=null;localStorage.removeItem(SK.session);document.getElementById('appContainer').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginUser').value='';document.getElementById('loginPass').value='';document.getElementById('loginAlert').innerHTML=''}
 function checkSession(){const s=gs(SK.session);if(s){const u=(gs(SK.users)||[]).find(x=>x.username===s.username);if(u){currentUser=u;showApp();return}}document.getElementById('loginScreen').style.display='flex'}
@@ -4398,7 +4397,6 @@ function importExcelData(input){
             if(!data.expenses&&!data.revenues){showToast('File không hợp lệ!');return}
             const existExp=gs(SK.expenses)||[];
             const existRev=gs(SK.revenues)||[];
-            // Remove old imported data (source=excel) before re-importing
             const keepExp=existExp.filter(x=>x.source!=='excel');
             const keepRev=existRev.filter(x=>x.source!=='excel');
             const newExp=data.expenses||[];
@@ -4481,7 +4479,7 @@ function handleAttach(id,input){
     });
 }
 
-// ========== CATEGORY DETAIL (click on category in table) ==========
+// ========== CATEGORY DETAIL ==========
 function showCatDetail(category){
     const exps=(gs(SK.expenses)||[]).filter(e=>e.category===category);
     const total=exps.reduce((s,e)=>s+e.amount,0);
@@ -4506,17 +4504,12 @@ function renderExpenseTracker(){
     const todayStr=today.toISOString().split('T')[0];
     const m=today.getMonth(),y=today.getFullYear();
     const isBoss=currentUser?.role==='boss';
-
-    // Today's total
     const todayTotal=exps.filter(e=>e.date===todayStr).reduce((s,e)=>s+e.amount,0);
-    // This month's total
     const monthExps=exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y});
     const monthTotal=monthExps.reduce((s,e)=>s+e.amount,0);
     const monthDays=new Set(monthExps.map(e=>e.date)).size;
     const avgDay=monthDays>0?monthTotal/monthDays:0;
-
     if(!isBoss){
-        // Staff/Leader: only show today's total
         document.getElementById('trackerStats').innerHTML=`
             <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="label">Chi hôm nay 今日支出</div><div class="value negative">${fmt(todayTotal)}</div></div>`;
     } else {
@@ -4526,21 +4519,16 @@ function renderExpenseTracker(){
             <div class="stat-card" style="border-left:3px solid var(--primary)"><div class="label">TB/ngày 日均</div><div class="value">${fmt(Math.round(avgDay))}</div></div>
             <div class="stat-card" style="border-left:3px solid var(--purple)"><div class="label">Số khoản tháng 本月筆數</div><div class="value">${monthExps.length}</div></div>`;
     }
-
-    // Hide charts and category breakdown for non-boss
     if(!isBoss){
         document.getElementById('trackerChart7d').innerHTML='';
         document.getElementById('trackerChart7dLabels').innerHTML='';
         document.getElementById('trackerCategoryList').innerHTML='';
-        // Hide the tracker-grid
         const tGrid=document.querySelector('.tracker-grid');
         if(tGrid)tGrid.style.display='none';
         return;
     }
     const tGrid2=document.querySelector('.tracker-grid');
     if(tGrid2)tGrid2.style.display='';
-
-    // 7-day bar chart
     const chart=document.getElementById('trackerChart7d');
     const labels=document.getElementById('trackerChart7dLabels');
     const days=[];
@@ -4559,8 +4547,6 @@ function renderExpenseTracker(){
         </div>`;
     }).join('');
     labels.innerHTML=days.map(d=>`<span>${d.label}</span>`).join('');
-
-    // Category breakdown (this month)
     const byCat={};monthExps.forEach(e=>{byCat[e.category]=(byCat[e.category]||0)+e.amount});
     const catList=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
     const catContainer=document.getElementById('trackerCategoryList');
@@ -4579,11 +4565,9 @@ function renderExpenseTracker(){
 
 // ========== INIT ==========
 initData();
-// If Sheet URL is set, load from Sheet first, then check session
 if(getSheetUrl()){
     loadFromSheet(function(ok){
         checkSession();
-        // Refresh current page if already logged in
         if(currentUser){
             const activeEl=document.querySelector('.nav-item.active');
             if(activeEl)navigateTo(activeEl.dataset.page);
