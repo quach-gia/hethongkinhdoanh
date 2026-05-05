@@ -1102,41 +1102,54 @@ function syncDeleteFromSheet(type, ids){
     sheetPost({action:'delete',type,ids:Array.isArray(ids)?ids:[ids]});
 }
 
-// LOAD ALL data from Sheet → localStorage
+// LOAD data from Sheet → localStorage (fetch each type separately to avoid large response issues)
+function fetchSheetAction(url,action){
+    return fetch(url+'?action='+action,{redirect:'follow'}).then(r=>{
+        if(!r.ok)throw new Error('HTTP '+r.status);
+        return r.text();
+    }).then(txt=>{
+        try{return JSON.parse(txt)}catch(e){console.warn('JSON parse error for '+action+':',txt.substring(0,200));return{status:'error'}}
+    });
+}
 function loadFromSheet(callback,silent){
     const url=getSheetUrl();
     if(!url){if(callback)callback(false);return}
     cloudLoading=true;
     if(!silent)showToast('Đang tải dữ liệu từ Google Sheet... ⏳');
-    fetch(url+'?action=all')
-    .then(r=>r.json())
-    .then(data=>{
-        if(data.status==='ok'){
-            if(data.expenses&&data.expenses.length) ss(SK.expenses,data.expenses);
-            if(data.revenues&&data.revenues.length) ss(SK.revenues,data.revenues);
-            if(data.shifts&&data.shifts.length) ss(SK.shifts,data.shifts);
-            if(data.topups&&data.topups.length) ss('qg_topups',data.topups);
-            if(data.users&&data.users.length) ss(SK.users,data.users);
-            cloudReady=true;
-            if(!silent)showToast('✓ Đã tải dữ liệu từ Sheet!');
-            console.log('Cloud loaded: '+
-                (data.expenses||[]).length+'exp, '+
-                (data.revenues||[]).length+'rev, '+
-                (data.shifts||[]).length+'shift, '+
-                (data.topups||[]).length+'topup, '+
-                (data.users||[]).length+'user');
-        }else{
-            if(!silent)showToast('⚠ Lỗi tải Sheet: '+(data.message||''));
+    const types=[
+        {action:'users',key:SK.users},
+        {action:'expenses',key:SK.expenses},
+        {action:'revenues',key:SK.revenues},
+        {action:'shifts',key:SK.shifts},
+        {action:'topups',key:'qg_topups'}
+    ];
+    let loaded=0,total=types.length;
+    let anyOk=false;
+    function loadNext(){
+        if(loaded>=total){
+            cloudReady=anyOk;
+            cloudLoading=false;
+            if(!silent&&anyOk)showToast('✓ Đã tải dữ liệu từ Sheet!');
+            if(callback)callback(cloudReady);
+            return;
         }
-        cloudLoading=false;
-        if(callback)callback(cloudReady);
-    })
-    .catch(err=>{
-        console.warn('Load from Sheet error:',err);
-        if(!silent)showToast('⚠ Không kết nối được Sheet. Dùng dữ liệu local.');
-        cloudLoading=false;
-        if(callback)callback(false);
-    });
+        const t=types[loaded];
+        fetchSheetAction(url,t.action).then(data=>{
+            if(data.status==='ok'&&data.data&&data.data.length){
+                ss(t.key,data.data);
+                anyOk=true;
+                console.log('Cloud '+t.action+': '+data.data.length+' records');
+            }else{
+                console.log('Cloud '+t.action+': 0 records or error');
+            }
+        }).catch(err=>{
+            console.warn('Load '+t.action+' error:',err);
+        }).finally(()=>{
+            loaded++;
+            loadNext();
+        });
+    }
+    loadNext();
 }
 
 // Manual refresh from Sheet + re-render current page
@@ -4389,6 +4402,7 @@ function syncAllToSheet(){
     };
     addBatches('user',users); // Users first so login works
     addBatches('expense',exps);
+    addBatches('expense',exps);
     addBatches('revenue',revs);
     addBatches('shift',shifts);
     addBatches('topup',topups);
@@ -4398,7 +4412,6 @@ function syncAllToSheet(){
     const st=document.getElementById('gsheetStatus');
     st.innerHTML='<span style="color:var(--warning)">⏳ Đang đồng bộ 0/'+totalBatches+' batch ('+total+' bản ghi)...</span>';
     showToast('Bắt đầu đồng bộ '+total+' bản ghi... Vui lòng chờ!');
-    // Send one batch at a time with 3s delay
     function sendNext(){
         if(sent>=queue.length){
             st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ xong '+total+' bản ghi!</span>';
