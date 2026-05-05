@@ -1064,8 +1064,9 @@
 <script>
 // ========== STORE ==========
 const SK={users:'qg_users',expenses:'qg_expenses',revenues:'qg_revenues',shifts:'qg_shifts',session:'qg_session',categories:'qg_categories',suppliers:'qg_suppliers',shareholders:'qg_shareholders',benefits:'qg_benefits',benefitEntries:'qg_benefit_entries',dividendSettings:'qg_dividend_settings',dividendPayments:'qg_dividend_payments',otherFees:'qg_other_fees',dividendSkip:'qg_dividend_skip',taxRevManual:'qg_tax_rev_manual'};
-function gs(k){const d=localStorage.getItem(k);return d?JSON.parse(d):null}
-function ss(k,d){localStorage.setItem(k,JSON.stringify(d))}
+const _mem={};
+function gs(k){if(_mem[k]!==undefined)return _mem[k];const d=localStorage.getItem(k);return d?JSON.parse(d):null}
+function ss(k,d){_mem[k]=d;try{localStorage.setItem(k,JSON.stringify(d))}catch(e){console.warn('localStorage full, key='+k,e)}}
 
 // ========== GOOGLE SHEET CLOUD DATA ==========
 const GSHEET_URL=localStorage.getItem('qg_gsheet_url')||'';
@@ -4423,7 +4424,6 @@ function importExcelData(input){
             if(!data.expenses&&!data.revenues){showToast('File không hợp lệ!');return}
             const existExp=gs(SK.expenses)||[];
             const existRev=gs(SK.revenues)||[];
-            // Remove old imported data (source=excel) before re-importing
             const keepExp=existExp.filter(x=>x.source!=='excel');
             const keepRev=existRev.filter(x=>x.source!=='excel');
             const newExp=data.expenses||[];
@@ -4506,7 +4506,7 @@ function handleAttach(id,input){
     });
 }
 
-// ========== CATEGORY DETAIL (click on category in table) ==========
+// ========== CATEGORY DETAIL ==========
 function showCatDetail(category){
     const exps=(gs(SK.expenses)||[]).filter(e=>e.category===category);
     const total=exps.reduce((s,e)=>s+e.amount,0);
@@ -4531,17 +4531,12 @@ function renderExpenseTracker(){
     const todayStr=today.toISOString().split('T')[0];
     const m=today.getMonth(),y=today.getFullYear();
     const isBoss=currentUser?.role==='boss';
-
-    // Today's total
     const todayTotal=exps.filter(e=>e.date===todayStr).reduce((s,e)=>s+e.amount,0);
-    // This month's total
     const monthExps=exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y});
     const monthTotal=monthExps.reduce((s,e)=>s+e.amount,0);
     const monthDays=new Set(monthExps.map(e=>e.date)).size;
     const avgDay=monthDays>0?monthTotal/monthDays:0;
-
     if(!isBoss){
-        // Staff/Leader: only show today's total
         document.getElementById('trackerStats').innerHTML=`
             <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="label">Chi hôm nay 今日支出</div><div class="value negative">${fmt(todayTotal)}</div></div>`;
     } else {
@@ -4551,21 +4546,16 @@ function renderExpenseTracker(){
             <div class="stat-card" style="border-left:3px solid var(--primary)"><div class="label">TB/ngày 日均</div><div class="value">${fmt(Math.round(avgDay))}</div></div>
             <div class="stat-card" style="border-left:3px solid var(--purple)"><div class="label">Số khoản tháng 本月筆數</div><div class="value">${monthExps.length}</div></div>`;
     }
-
-    // Hide charts and category breakdown for non-boss
     if(!isBoss){
         document.getElementById('trackerChart7d').innerHTML='';
         document.getElementById('trackerChart7dLabels').innerHTML='';
         document.getElementById('trackerCategoryList').innerHTML='';
-        // Hide the tracker-grid
         const tGrid=document.querySelector('.tracker-grid');
         if(tGrid)tGrid.style.display='none';
         return;
     }
     const tGrid2=document.querySelector('.tracker-grid');
     if(tGrid2)tGrid2.style.display='';
-
-    // 7-day bar chart
     const chart=document.getElementById('trackerChart7d');
     const labels=document.getElementById('trackerChart7dLabels');
     const days=[];
@@ -4584,8 +4574,6 @@ function renderExpenseTracker(){
         </div>`;
     }).join('');
     labels.innerHTML=days.map(d=>`<span>${d.label}</span>`).join('');
-
-    // Category breakdown (this month)
     const byCat={};monthExps.forEach(e=>{byCat[e.category]=(byCat[e.category]||0)+e.amount});
     const catList=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
     const catContainer=document.getElementById('trackerCategoryList');
@@ -4604,11 +4592,9 @@ function renderExpenseTracker(){
 
 // ========== INIT ==========
 initData();
-// If Sheet URL is set, load from Sheet first, then check session
 if(getSheetUrl()){
     loadFromSheet(function(ok){
         checkSession();
-        // Refresh current page if already logged in
         if(currentUser){
             const activeEl=document.querySelector('.nav-item.active');
             if(activeEl)navigateTo(activeEl.dataset.page);
