@@ -1074,7 +1074,7 @@ let cloudReady=false;
 let cloudLoading=false;
 
 const DEFAULT_SHEET_URL='https://script.google.com/macros/s/AKfycbyWTO9FcXnGuDWl0_rHxX6hJ47Ts0cDAuDfpPza_NBHrnqw57tYoDD3PMwyWaBSce4/exec';
-function getSheetUrl(){return localStorage.getItem('qg_gsheet_url')||DEFAULT_SHEET_URL}
+function getSheetUrl(){return DEFAULT_SHEET_URL||localStorage.getItem('qg_gsheet_url')}
 function setSheetUrl(url){localStorage.setItem('qg_gsheet_url',url);location.reload()}
 
 // POST to Sheet (write/update/delete)
@@ -1102,16 +1102,12 @@ function syncDeleteFromSheet(type, ids){
     sheetPost({action:'delete',type,ids:Array.isArray(ids)?ids:[ids]});
 }
 
-// LOAD data from Sheet → localStorage (fetch each type separately to avoid large response issues)
+// LOAD data from Sheet → localStorage (parallel fetch for speed)
 function fetchSheetAction(url,action){
-    return fetch(url+'?action='+action).then(r=>{
-        console.log('Fetch '+action+': status='+r.status+' ok='+r.ok+' type='+r.type+' url='+r.url);
-        return r.text();
-    }).then(txt=>{
-        console.log('Fetch '+action+' response length: '+txt.length);
-        if(!txt||txt.length<5){console.warn('Empty response for '+action);return{status:'error'}}
-        try{return JSON.parse(txt)}catch(e){console.warn('JSON parse error for '+action+':',txt.substring(0,200));return{status:'error'}}
-    });
+    return fetch(url+'?action='+action).then(r=>r.text()).then(txt=>{
+        if(!txt||txt.length<5)return{status:'error'};
+        try{return JSON.parse(txt)}catch(e){return{status:'error'}}
+    }).catch(()=>({status:'error'}));
 }
 function loadFromSheet(callback,silent){
     const url=getSheetUrl();
@@ -1125,33 +1121,20 @@ function loadFromSheet(callback,silent){
         {action:'shifts',key:SK.shifts},
         {action:'topups',key:'qg_topups'}
     ];
-    let loaded=0,total=types.length;
-    let anyOk=false;
-    function loadNext(){
-        if(loaded>=total){
-            cloudReady=anyOk;
-            cloudLoading=false;
-            if(!silent&&anyOk)showToast('✓ Đã tải dữ liệu từ Sheet!');
-            if(callback)callback(cloudReady);
-            return;
+    Promise.all(types.map(t=>fetchSheetAction(url,t.action).then(data=>{
+        if(data.status==='ok'&&data.data&&data.data.length){
+            ss(t.key,data.data);
+            console.log('Cloud '+t.action+': '+data.data.length);
+            return true;
         }
-        const t=types[loaded];
-        fetchSheetAction(url,t.action).then(data=>{
-            if(data.status==='ok'&&data.data&&data.data.length){
-                ss(t.key,data.data);
-                anyOk=true;
-                console.log('Cloud '+t.action+': '+data.data.length+' records');
-            }else{
-                console.log('Cloud '+t.action+': 0 records or error');
-            }
-        }).catch(err=>{
-            console.warn('Load '+t.action+' error:',err);
-        }).finally(()=>{
-            loaded++;
-            loadNext();
-        });
-    }
-    loadNext();
+        console.log('Cloud '+t.action+': 0');
+        return false;
+    }))).then(results=>{
+        cloudReady=results.some(r=>r);
+        cloudLoading=false;
+        if(!silent&&cloudReady)showToast('✓ Đã tải dữ liệu từ Sheet!');
+        if(callback)callback(cloudReady);
+    });
 }
 
 // Manual refresh from Sheet + re-render current page
