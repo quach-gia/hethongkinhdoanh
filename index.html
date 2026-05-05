@@ -4308,32 +4308,44 @@ function testSheetConnection(){
 function syncAllToSheet(){
     const url=localStorage.getItem('qg_gsheet_url');
     if(!url){showToast('Chưa cài đặt URL Google Sheet!');return}
-    if(!confirm('Đồng bộ TOÀN BỘ dữ liệu lên Google Sheet?\n(Dữ liệu trùng ID sẽ tự động bỏ qua)'))return;
+    if(!confirm('Đồng bộ TOÀN BỘ dữ liệu lên Google Sheet?\n(Dữ liệu trùng ID sẽ tự động bỏ qua)\n\nQuá trình có thể mất 1-2 phút, vui lòng chờ.'))return;
     const exps=gs(SK.expenses)||[];
     const revs=gs(SK.revenues)||[];
     const shifts=gs(SK.shifts)||[];
     const topups=gs('qg_topups')||[];
-    let synced=0;
-    const doSync=(type,data)=>{
-        if(!data.length)return;
-        // Split into batches of 50
-        for(let i=0;i<data.length;i+=50){
-            const batch=data.slice(i,i+50);
-            setTimeout(()=>{
-                syncToSheet(type,batch);
-                synced+=batch.length;
-            },(i/50)*1000);
+    const users=gs(SK.users)||[];
+    // Build queue: split all data into small batches, send one at a time
+    const queue=[];
+    const addBatches=(type,data)=>{
+        for(let i=0;i<data.length;i+=20){
+            queue.push({type,batch:data.slice(i,i+20)});
         }
     };
-    const users=gs(SK.users)||[];
-    doSync('expense',exps);
-    doSync('revenue',revs);
-    doSync('shift',shifts);
-    doSync('topup',topups);
-    doSync('user',users);
+    addBatches('user',users); // Users first so login works
+    addBatches('expense',exps);
+    addBatches('revenue',revs);
+    addBatches('shift',shifts);
+    addBatches('topup',topups);
     const total=exps.length+revs.length+shifts.length+topups.length+users.length;
-    showToast('Đang đồng bộ '+total+' bản ghi...');
-    document.getElementById('gsheetStatus').innerHTML='<span style="color:var(--success)">Đang gửi '+total+' bản ghi ('+exps.length+' chi tiêu, '+revs.length+' doanh thu, '+shifts.length+' mở ca, '+topups.length+' topup, '+users.length+' user)</span>';
+    const totalBatches=queue.length;
+    let sent=0;
+    const st=document.getElementById('gsheetStatus');
+    st.innerHTML='<span style="color:var(--warning)">⏳ Đang đồng bộ 0/'+totalBatches+' batch ('+total+' bản ghi)...</span>';
+    showToast('Bắt đầu đồng bộ '+total+' bản ghi... Vui lòng chờ!');
+    // Send one batch at a time with 3s delay
+    function sendNext(){
+        if(sent>=queue.length){
+            st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ xong '+total+' bản ghi!</span>';
+            showToast('✓ Đồng bộ hoàn tất!');
+            return;
+        }
+        const item=queue[sent];
+        syncToSheet(item.type,item.batch);
+        sent++;
+        st.innerHTML='<span style="color:var(--warning)">⏳ Đang gửi '+sent+'/'+totalBatches+' batch...</span>';
+        setTimeout(sendNext,3000);
+    }
+    sendNext();
 }
 
 // ========== IMPORT / EXPORT ==========
@@ -4464,7 +4476,6 @@ function renderExpenseTracker(){
     const avgDay=monthDays>0?monthTotal/monthDays:0;
 
     if(!isBoss){
-        // Staff/Leader: only show today's total
         document.getElementById('trackerStats').innerHTML=`
             <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="label">Chi hôm nay 今日支出</div><div class="value negative">${fmt(todayTotal)}</div></div>`;
     } else {
@@ -4475,12 +4486,10 @@ function renderExpenseTracker(){
             <div class="stat-card" style="border-left:3px solid var(--purple)"><div class="label">Số khoản tháng 本月筆數</div><div class="value">${monthExps.length}</div></div>`;
     }
 
-    // Hide charts and category breakdown for non-boss
     if(!isBoss){
         document.getElementById('trackerChart7d').innerHTML='';
         document.getElementById('trackerChart7dLabels').innerHTML='';
         document.getElementById('trackerCategoryList').innerHTML='';
-        // Hide the tracker-grid
         const tGrid=document.querySelector('.tracker-grid');
         if(tGrid)tGrid.style.display='none';
         return;
