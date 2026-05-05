@@ -570,7 +570,7 @@
                         </colgroup>
                         <thead><tr>
                             <th><input type="checkbox" id="checkAllRev" onchange="toggleCheckAllRev(this)"></th>
-                            <th>#</th>
+                            <th>Mã<br><span style="font-weight:400;font-size:9px;color:var(--text-muted)">編號</span></th>
                             <th>Ngày/Giờ<br><span style="font-weight:400;font-size:9px;color:var(--text-muted)">日期</span></th>
                             <th>Ca<br><span style="font-weight:400;font-size:9px;color:var(--text-muted)">班次</span></th>
                             <th style="text-align:right">T.Mặt<br><span style="font-weight:400;font-size:9px;color:var(--text-muted)">現金</span></th>
@@ -1061,6 +1061,49 @@
     </div>
 </div>
 
+<div class="modal-overlay" id="modalEditRevenue">
+    <div class="modal" style="max-width:640px">
+        <h3>Chi tiết doanh thu <span style="font-size:13px;font-weight:400;color:var(--text-muted)">營業額詳情</span></h3>
+        <div id="editRevInfo" style="margin-bottom:12px;padding:8px 12px;background:var(--bg-secondary);border-radius:8px;font-size:12px;color:var(--text-muted)"></div>
+        <div class="form-row">
+            <div class="form-group"><label>Ngày 日期</label><input type="date" id="editrev-date"></div>
+            <div class="form-group"><label>Ca 班次</label><select id="editrev-shift"><option value="1">Ca 1 班1</option><option value="2">Ca 2 班2</option><option value="3">Ca 3 班3</option></select></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>TM đầu ca 現金開班</label><input type="text" id="editrev-cash1" oninput="calcEditRev()"></div>
+            <div class="form-group"><label>TM cuối ca 現金結班</label><input type="text" id="editrev-cash2" oninput="calcEditRev()"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Chuyển khoản 轉帳</label><input type="text" id="editrev-transfer" oninput="calcEditRev()"></div>
+            <div class="form-group"><label>Grab</label><input type="text" id="editrev-grab" oninput="calcEditRev()"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Tip 小費</label><input type="text" id="editrev-tip" oninput="calcEditRev()"></div>
+            <div class="form-group"><label>Khác 其他</label><input type="text" id="editrev-other" oninput="calcEditRev()"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>NV tên 員工姓名</label><input type="text" id="editrev-staffname"></div>
+            <div class="form-group"><label>NV tiền 員工金額</label><input type="text" id="editrev-staffamt" oninput="calcEditRev()"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Ghi chú khác</label><input type="text" id="editrev-othernote"></div>
+            <div class="form-group"><label>Hệ thống 系統</label><input type="text" id="editrev-system" oninput="calcEditRev()"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>Người kiểm 檢查人</label><input type="text" id="editrev-checker"></div>
+            <div class="form-group"><label>Ghi chú 備註</label><input type="text" id="editrev-note"></div>
+        </div>
+        <div style="margin:10px 0;padding:10px 14px;background:var(--bg-secondary);border-radius:8px;display:flex;gap:16px;flex-wrap:wrap;font-size:13px">
+            <span>Thực thu 實際: <strong id="editrev-actual" style="color:var(--success)">0</strong></span>
+            <span>Chênh lệch 差額: <strong id="editrev-diff" style="color:var(--danger)">0</strong></span>
+        </div>
+        <div class="flex gap-2 mt-3">
+            <button class="btn btn-primary" onclick="confirmEditRevenue()">Lưu 保存</button>
+            <button class="btn btn-outline" onclick="closeModal('modalEditRevenue')">Hủy 取消</button>
+        </div>
+    </div>
+</div>
+
 <script>
 // ========== STORE ==========
 const SK={users:'qg_users',expenses:'qg_expenses',revenues:'qg_revenues',shifts:'qg_shifts',session:'qg_session',categories:'qg_categories',suppliers:'qg_suppliers',shareholders:'qg_shareholders',benefits:'qg_benefits',benefitEntries:'qg_benefit_entries',dividendSettings:'qg_dividend_settings',dividendPayments:'qg_dividend_payments',otherFees:'qg_other_fees',dividendSkip:'qg_dividend_skip',taxRevManual:'qg_tax_rev_manual'};
@@ -1122,20 +1165,21 @@ function loadFromSheet(callback,silent){
         {action:'topups',key:'qg_topups'}
     ];
     Promise.all(types.map(t=>fetchSheetAction(url,t.action).then(data=>{
-        if(data.status==='ok'&&data.data&&data.data.length){
+        if(data.status==='ok'&&data.data){
             // Sort by date desc + createdAt desc so newest records appear first
-            if(t.action!=='users'){
+            if(t.action!=='users'&&data.data.length){
                 data.data.sort(function(a,b){
                     var cmp=(b.date||'').localeCompare(a.date||'');
                     if(cmp!==0)return cmp;
                     return(b.createdAt||'').localeCompare(a.createdAt||'');
                 });
             }
+            // Always overwrite localStorage with Sheet data (handles deletes)
             ss(t.key,data.data);
             console.log('Cloud '+t.action+': '+data.data.length);
-            return true;
+            return data.data.length>0;
         }
-        console.log('Cloud '+t.action+': 0');
+        console.log('Cloud '+t.action+': fetch error');
         return false;
     }))).then(results=>{
         cloudReady=results.some(r=>r);
@@ -1953,9 +1997,9 @@ function renderRevenueSummary(){
         let extras=[];
         if(r.staffName)extras.push(`<div style="font-size:10px;color:var(--purple)">NV: ${escHtml(r.staffName)} ${fmtNum(r.staffAmount)}</div>`);
         if(r.otherNote)extras.push(`<div style="font-size:10px;color:var(--text-muted)">${escHtml(r.otherNote)}</div>`);
-        return `<tr class="${rowClass}" data-revid="${r.id}">
-            <td><input type="checkbox" class="rev-check" data-id="${r.id}" onchange="updateRevBatchBar()"></td>
-            <td>${i+1}</td>
+        return `<tr class="${rowClass}" data-revid="${r.id}" onclick="openRevDetail('${r.id}')" style="cursor:pointer">
+            <td onclick="event.stopPropagation()"><input type="checkbox" class="rev-check" data-id="${r.id}" onchange="updateRevBatchBar()"></td>
+            <td style="font-size:11px;color:var(--primary);font-weight:600">DT-${String(r.id).slice(-4)}</td>
             <td style="font-size:12px;line-height:1.3">${r.date}<br><span style="color:var(--text-muted)">${r.timeStr||''}</span></td>
             <td><span class="badge badge-info" style="font-size:10px;padding:2px 5px">${shiftLabel[r.shift]||r.shift}</span></td>
             <td class="text-right" style="font-size:12px">${fmtNum(cash)}</td>
@@ -1969,8 +2013,8 @@ function renderRevenueSummary(){
             <td class="text-right" style="font-size:12px;color:var(--text-muted)">${fmtNum(r.systemTotal)}</td>
             <td class="text-right" style="font-size:12px;font-weight:700;color:${diffColor}">${fmtNum(r.diff)}</td>
             <td style="font-size:11px;overflow:hidden;text-overflow:ellipsis">${escHtml(r.displayName||r.checker||r.user||'')}</td>
-            <td class="text-center">${isBoss?`<button class="btn-xs ${confirmed?'btn-success':'btn-outline'}" onclick="toggleRevConfirm('${r.id}')" style="font-size:10px;padding:3px 6px">${confirmed?'✓':'Xác nhận 確認'}</button>`:(confirmed?'<span style="color:var(--success)">✓</span>':'')}</td>
-            <td class="edit-actions" style="white-space:nowrap">
+            <td class="text-center" onclick="event.stopPropagation()">${isBoss?`<button class="btn-xs ${confirmed?'btn-success':'btn-outline'}" onclick="toggleRevConfirm('${r.id}')" style="font-size:10px;padding:3px 6px">${confirmed?'✓':'Xác nhận 確認'}</button>`:(confirmed?'<span style="color:var(--success)">✓</span>':'')}</td>
+            <td class="edit-actions" style="white-space:nowrap" onclick="event.stopPropagation()">
                 ${!confirmed||isBoss?`<button class="btn-ghost btn-xs" onclick="editRevenue('${r.id}')" title="Sửa 編輯" style="padding:2px 4px">✏️</button><button class="btn-ghost btn-xs" onclick="deleteRevenue('${r.id}')" title="Xóa 刪除" style="color:var(--danger);padding:2px 4px">🗑️</button>`:''}
             </td>
         </tr>`;
@@ -1983,32 +2027,81 @@ function toggleRevConfirm(id){
     if(r){r.confirmed=!r.confirmed;ss(SK.revenues,revs);syncUpdateToSheet('revenue',[r]);renderRevenueSummary()}
 }
 function editRevenue(id){
+    openRevDetail(id);
+}
+function openRevDetail(id){
     const revs=gs(SK.revenues)||[];
     const r=revs.find(x=>String(x.id)===String(id));
     if(!r)return;
-    if(r.confirmed&&currentUser.role!=='boss'){alert('Đã xác nhận, không thể sửa');return}
-    // Fill form with data
-    document.getElementById('revenue-date').value=r.date;
-    document.getElementById('revenue-shift').value=r.shift;
-    document.getElementById('rev-cash1').value=r.cash1?fmtNum(r.cash1):'';
-    document.getElementById('rev-cash2').value=r.cash2?fmtNum(r.cash2):'';
-    document.getElementById('rev-transfer').value=r.transfer?fmtNum(r.transfer):'';
-    document.getElementById('rev-grab').value=r.grab?fmtNum(r.grab):'';
-    document.getElementById('rev-tip').value=r.tip?fmtNum(r.tip):'';
-    document.getElementById('rev-staff-name').value=r.staffName||'';
-    document.getElementById('rev-staff-amount').value=r.staffAmount?fmtNum(r.staffAmount):'';
-    document.getElementById('rev-other').value=r.other?fmtNum(r.other):'';
-    document.getElementById('rev-other-note').value=r.otherNote||'';
-    document.getElementById('rev-system').value=r.systemTotal?fmtNum(r.systemTotal):'';
-    document.getElementById('rev-note').value=r.note||'';
-    calcRevenue();
-    // Delete old record so save creates new
-    let revs2=gs(SK.revenues)||[];
-    revs2=revs2.filter(x=>String(x.id)!==String(id));
-    ss(SK.revenues,revs2);syncDeleteFromSheet('revenue',[id]);
+    const isBoss=currentUser?.role==='boss';
+    const canEdit=!r.confirmed||isBoss;
+    // Info bar
+    document.getElementById('editRevInfo').innerHTML=`<strong style="color:var(--primary)">DT-${String(r.id).slice(-4)}</strong> | Người nhập: <strong>${escHtml(r.displayName||r.user||'')}</strong> | Tạo lúc: ${r.createdAt||'—'} | ${r.confirmed?'<span style="color:var(--success)">✓ Đã xác nhận</span>':'<span style="color:var(--warning)">Chưa xác nhận</span>'}`;
+    // Fill form
+    document.getElementById('editrev-date').value=r.date;
+    document.getElementById('editrev-shift').value=r.shift||'1';
+    document.getElementById('editrev-cash1').value=r.cash1?fmtNum(r.cash1):'';
+    document.getElementById('editrev-cash2').value=r.cash2?fmtNum(r.cash2):'';
+    document.getElementById('editrev-transfer').value=r.transfer?fmtNum(r.transfer):'';
+    document.getElementById('editrev-grab').value=r.grab?fmtNum(r.grab):'';
+    document.getElementById('editrev-tip').value=r.tip?fmtNum(r.tip):'';
+    document.getElementById('editrev-staffname').value=r.staffName||'';
+    document.getElementById('editrev-staffamt').value=r.staffAmount?fmtNum(r.staffAmount):'';
+    document.getElementById('editrev-other').value=r.other?fmtNum(r.other):'';
+    document.getElementById('editrev-othernote').value=r.otherNote||'';
+    document.getElementById('editrev-system').value=r.systemTotal?fmtNum(r.systemTotal):'';
+    document.getElementById('editrev-checker').value=r.checker||'';
+    document.getElementById('editrev-note').value=r.note||'';
+    calcEditRev();
+    // Disable inputs if can't edit
+    document.querySelectorAll('#modalEditRevenue input,#modalEditRevenue select').forEach(el=>{el.disabled=!canEdit});
+    document.querySelector('#modalEditRevenue .btn-primary').style.display=canEdit?'':'none';
+    document.getElementById('modalEditRevenue').dataset.editId=id;
+    document.getElementById('modalEditRevenue').classList.add('open');
+}
+function calcEditRev(){
+    const p=s=>{const v=String(s||'').replace(/[.,\s]/g,'');return Number(v)||0};
+    const cash1=p(document.getElementById('editrev-cash1').value);
+    const cash2=p(document.getElementById('editrev-cash2').value);
+    const transfer=p(document.getElementById('editrev-transfer').value);
+    const grab=p(document.getElementById('editrev-grab').value);
+    const tip=p(document.getElementById('editrev-tip').value);
+    const staffAmt=p(document.getElementById('editrev-staffamt').value);
+    const other=p(document.getElementById('editrev-other').value);
+    const system=p(document.getElementById('editrev-system').value);
+    const actual=cash1+cash2+transfer+grab+tip+staffAmt+other;
+    const diff=actual-system;
+    document.getElementById('editrev-actual').textContent=fmtNum(actual);
+    document.getElementById('editrev-diff').textContent=fmtNum(diff);
+    document.getElementById('editrev-diff').style.color=diff>=0?'var(--success)':'var(--danger)';
+}
+function confirmEditRevenue(){
+    const id=document.getElementById('modalEditRevenue').dataset.editId;
+    const revs=gs(SK.revenues)||[];
+    const r=revs.find(x=>String(x.id)===String(id));
+    if(!r){showToast('Không tìm thấy record');return}
+    const p=s=>{const v=String(s||'').replace(/[.,\s]/g,'');return Number(v)||0};
+    r.date=document.getElementById('editrev-date').value;
+    r.shift=document.getElementById('editrev-shift').value;
+    r.cash1=p(document.getElementById('editrev-cash1').value);
+    r.cash2=p(document.getElementById('editrev-cash2').value);
+    r.transfer=p(document.getElementById('editrev-transfer').value);
+    r.grab=p(document.getElementById('editrev-grab').value);
+    r.tip=p(document.getElementById('editrev-tip').value);
+    r.staffName=document.getElementById('editrev-staffname').value;
+    r.staffAmount=p(document.getElementById('editrev-staffamt').value);
+    r.other=p(document.getElementById('editrev-other').value);
+    r.otherNote=document.getElementById('editrev-othernote').value;
+    r.systemTotal=p(document.getElementById('editrev-system').value);
+    r.checker=document.getElementById('editrev-checker').value;
+    r.note=document.getElementById('editrev-note').value;
+    r.totalActual=r.cash1+r.cash2+r.transfer+r.grab+r.tip+r.staffAmount+r.other;
+    r.diff=r.totalActual-r.systemTotal;
+    ss(SK.revenues,revs);
+    syncUpdateToSheet('revenue',[r]);
+    closeModal('modalEditRevenue');
     renderRevenueSummary();
-    window.scrollTo({top:0,behavior:'smooth'});
-    showToast('Đang chỉnh sửa — sửa xong nhấn Lưu');
+    showToast('✓ Đã cập nhật doanh thu!');
 }
 function deleteRevenue(id){
     if(!confirm('Xóa doanh thu này?'))return;
@@ -4287,6 +4380,7 @@ function showResetPassword(username){
     document.getElementById('rp-new').value='';
     document.getElementById('rp-confirm').value='';
     document.getElementById('rpAlert').innerHTML='';
+    document.getElementById('rpAlert').innerHTML='';
     document.getElementById('modalResetPass').classList.add('open');
     document.getElementById('modalResetPass').dataset.user=username;
 }
@@ -4395,7 +4489,7 @@ function syncAllToSheet(){
             queue.push({type,batch:data.slice(i,i+20)});
         }
     };
-    addBatches('user',users);
+    addBatches('user',users); // Users first so login works
     addBatches('expense',exps);
     addBatches('revenue',revs);
     addBatches('shift',shifts);
@@ -4406,6 +4500,7 @@ function syncAllToSheet(){
     const st=document.getElementById('gsheetStatus');
     st.innerHTML='<span style="color:var(--warning)">⏳ Đang đồng bộ 0/'+totalBatches+' batch ('+total+' bản ghi)...</span>';
     showToast('Bắt đầu đồng bộ '+total+' bản ghi... Vui lòng chờ!');
+    // Send one batch at a time with 3s delay
     function sendNext(){
         if(sent>=queue.length){
             st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ xong '+total+' bản ghi!</span>';
@@ -4431,6 +4526,7 @@ function importExcelData(input){
             if(!data.expenses&&!data.revenues){showToast('File không hợp lệ!');return}
             const existExp=gs(SK.expenses)||[];
             const existRev=gs(SK.revenues)||[];
+            // Remove old imported data (source=excel) before re-importing
             const keepExp=existExp.filter(x=>x.source!=='excel');
             const keepRev=existRev.filter(x=>x.source!=='excel');
             const newExp=data.expenses||[];
@@ -4513,7 +4609,7 @@ function handleAttach(id,input){
     });
 }
 
-// ========== CATEGORY DETAIL ==========
+// ========== CATEGORY DETAIL (click on category in table) ==========
 function showCatDetail(category){
     const exps=(gs(SK.expenses)||[]).filter(e=>e.category===category);
     const total=exps.reduce((s,e)=>s+e.amount,0);
@@ -4538,12 +4634,17 @@ function renderExpenseTracker(){
     const todayStr=today.toISOString().split('T')[0];
     const m=today.getMonth(),y=today.getFullYear();
     const isBoss=currentUser?.role==='boss';
+
+    // Today's total
     const todayTotal=exps.filter(e=>e.date===todayStr).reduce((s,e)=>s+e.amount,0);
+    // This month's total
     const monthExps=exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y});
     const monthTotal=monthExps.reduce((s,e)=>s+e.amount,0);
     const monthDays=new Set(monthExps.map(e=>e.date)).size;
     const avgDay=monthDays>0?monthTotal/monthDays:0;
+
     if(!isBoss){
+        // Staff/Leader: only show today's total
         document.getElementById('trackerStats').innerHTML=`
             <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="label">Chi hôm nay 今日支出</div><div class="value negative">${fmt(todayTotal)}</div></div>`;
     } else {
@@ -4553,16 +4654,21 @@ function renderExpenseTracker(){
             <div class="stat-card" style="border-left:3px solid var(--primary)"><div class="label">TB/ngày 日均</div><div class="value">${fmt(Math.round(avgDay))}</div></div>
             <div class="stat-card" style="border-left:3px solid var(--purple)"><div class="label">Số khoản tháng 本月筆數</div><div class="value">${monthExps.length}</div></div>`;
     }
+
+    // Hide charts and category breakdown for non-boss
     if(!isBoss){
         document.getElementById('trackerChart7d').innerHTML='';
         document.getElementById('trackerChart7dLabels').innerHTML='';
         document.getElementById('trackerCategoryList').innerHTML='';
+        // Hide the tracker-grid
         const tGrid=document.querySelector('.tracker-grid');
         if(tGrid)tGrid.style.display='none';
         return;
     }
     const tGrid2=document.querySelector('.tracker-grid');
     if(tGrid2)tGrid2.style.display='';
+
+    // 7-day bar chart
     const chart=document.getElementById('trackerChart7d');
     const labels=document.getElementById('trackerChart7dLabels');
     const days=[];
@@ -4581,6 +4687,8 @@ function renderExpenseTracker(){
         </div>`;
     }).join('');
     labels.innerHTML=days.map(d=>`<span>${d.label}</span>`).join('');
+
+    // Category breakdown (this month)
     const byCat={};monthExps.forEach(e=>{byCat[e.category]=(byCat[e.category]||0)+e.amount});
     const catList=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
     const catContainer=document.getElementById('trackerCategoryList');
@@ -4599,9 +4707,11 @@ function renderExpenseTracker(){
 
 // ========== INIT ==========
 initData();
+// Show cached data immediately, fetch in background (stale-while-revalidate)
 checkSession();
 if(getSheetUrl()){
     loadFromSheet(function(ok){
+        // Re-render current page with fresh data
         if(ok&&currentUser){
             const activeEl=document.querySelector('.nav-item.active');
             if(activeEl)navigateTo(activeEl.dataset.page);
