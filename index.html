@@ -1069,7 +1069,8 @@ const GSHEET_URL=localStorage.getItem('qg_gsheet_url')||'';
 let cloudReady=false;
 let cloudLoading=false;
 
-function getSheetUrl(){return localStorage.getItem('qg_gsheet_url')||''}
+const DEFAULT_SHEET_URL='https://script.google.com/macros/s/AKfycbwzNJNrf-hC6zm-nEP0PSads9GHeoVEXlsqu5VWxDi2swuFq2vBOW0S8NsiZow4wv8/exec';
+function getSheetUrl(){return localStorage.getItem('qg_gsheet_url')||DEFAULT_SHEET_URL}
 function setSheetUrl(url){localStorage.setItem('qg_gsheet_url',url);location.reload()}
 
 // POST to Sheet (write/update/delete)
@@ -1175,9 +1176,28 @@ function initData(){
 let currentUser=null;
 function doLogin(){
     const u=document.getElementById('loginUser').value.trim().toLowerCase(),p=document.getElementById('loginPass').value;
-    const user=(gs(SK.users)||[]).find(x=>x.username===u&&x.password===p);
-    if(user){currentUser=user;ss(SK.session,{username:user.username});showApp()}
-    else{document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Sai tên đăng nhập hoặc mật khẩu!</div>'}
+    const users=gs(SK.users)||[];
+    const user=users.find(x=>x.username===u&&x.password===p);
+    if(user){currentUser=user;ss(SK.session,{username:user.username});showApp();return}
+    // If no local users, try loading from Sheet first
+    const url=getSheetUrl();
+    if(url&&users.length===0){
+        document.getElementById('loginAlert').innerHTML='<div class="alert" style="background:var(--warning);color:#000">Đang tải dữ liệu... ⏳</div>';
+        fetch(url+'?action=all').then(r=>r.json()).then(data=>{
+            if(data.status==='ok'){
+                if(data.users&&data.users.length)ss(SK.users,data.users);
+                if(data.expenses&&data.expenses.length)ss(SK.expenses,data.expenses);
+                if(data.revenues&&data.revenues.length)ss(SK.revenues,data.revenues);
+                if(data.shifts&&data.shifts.length)ss(SK.shifts,data.shifts);
+                if(data.topups&&data.topups.length)ss('qg_topups',data.topups);
+                const u2=(gs(SK.users)||[]).find(x=>x.username===u&&x.password===p);
+                if(u2){currentUser=u2;ss(SK.session,{username:u2.username});showApp()}
+                else{document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Sai tên đăng nhập hoặc mật khẩu!</div>'}
+            }else{document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Lỗi kết nối server!</div>'}
+        }).catch(err=>{document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Không kết nối được server: '+err.message+'</div>'});
+        return;
+    }
+    document.getElementById('loginAlert').innerHTML='<div class="alert alert-danger">Sai tên đăng nhập hoặc mật khẩu!</div>';
 }
 function doLogout(){currentUser=null;localStorage.removeItem(SK.session);document.getElementById('appContainer').style.display='none';document.getElementById('loginScreen').style.display='flex';document.getElementById('loginUser').value='';document.getElementById('loginPass').value='';document.getElementById('loginAlert').innerHTML=''}
 function checkSession(){const s=gs(SK.session);if(s){const u=(gs(SK.users)||[]).find(x=>x.username===s.username);if(u){currentUser=u;showApp();return}}document.getElementById('loginScreen').style.display='flex'}
@@ -4375,32 +4395,4 @@ function importExcelData(input){
     reader.onload=function(e){
         try{
             const data=JSON.parse(e.target.result);
-            if(!data.expenses&&!data.revenues){showToast('File không hợp lệ!');return}
-            const existExp=gs(SK.expenses)||[];
-            const existRev=gs(SK.revenues)||[];
-            // Remove old imported data (source=excel) before re-importing
-            const keepExp=existExp.filter(x=>x.source!=='excel');
-            const keepRev=existRev.filter(x=>x.source!=='excel');
-            const newExp=data.expenses||[];
-            const newRev=data.revenues||[];
-            ss(SK.expenses,[...keepExp,...newExp]);
-            ss(SK.revenues,[...keepRev,...newRev]);
-            if(newExp.length)syncToSheet('expense',newExp);
-            if(newRev.length)syncToSheet('revenue',newRev);
-            const el=document.getElementById('importStatus');
-            el.innerHTML=`<span style="color:var(--success);font-weight:700">✅ Đã nhập thành công!</span><br>Chi tiêu: ${newExp.length} khoản | Doanh thu: ${newRev.length} ngày<br><span style="font-size:10px">(Dữ liệu nhập tay trước đó vẫn được giữ nguyên)</span>`;
-            showToast(`Nhập thành công: ${newExp.length} chi tiêu + ${newRev.length} doanh thu`);
-        }catch(err){showToast('Lỗi đọc file: '+err.message)}
-    };
-    reader.readAsText(file);input.value='';
-}
-function exportAllData(){
-    const data={
-        expenses:gs(SK.expenses)||[],
-        revenues:gs(SK.revenues)||[],
-        shifts:gs(SK.shifts)||[],
-        topups:gs('qg_topups')||[],
-        exportedAt:new Date().toISOString()
-    };
-    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-    const a=document.createElement('a');a.href=UR
+            if(!data.expenses&&!data.revenues){showToast(
