@@ -1073,7 +1073,7 @@ const GSHEET_URL=localStorage.getItem('qg_gsheet_url')||'';
 let cloudReady=false;
 let cloudLoading=false;
 
-const DEFAULT_SHEET_URL='https://script.google.com/macros/s/AKfycbx2Ymqov1iVHdnd18aKRZl3yioqB6L06jms_vnq5kQgryleuc7tDxDOTQqhlvYroG8/exec';
+const DEFAULT_SHEET_URL='https://script.google.com/macros/s/AKfycbyWTO9FcXnGuDWl0_rHxX6hJ47Ts0cDAuDfpPza_NBHrnqw57tYoDD3PMwyWaBSce4/exec';
 function getSheetUrl(){return localStorage.getItem('qg_gsheet_url')||DEFAULT_SHEET_URL}
 function setSheetUrl(url){localStorage.setItem('qg_gsheet_url',url);location.reload()}
 
@@ -4401,7 +4401,6 @@ function syncAllToSheet(){
         }
     };
     addBatches('user',users); // Users first so login works
-    addBatches('expense',exps);
     addBatches('expense',exps);
     addBatches('revenue',revs);
     addBatches('shift',shifts);
