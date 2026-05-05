@@ -462,7 +462,7 @@
                             <div class="ei-field" style="margin:0"><input type="date" id="revenue-date" style="padding:7px 10px;font-size:13px"></div>
                             <div class="ei-field" style="margin:0">
                                 <select id="revenue-shift" style="padding:7px 10px;font-size:13px">
-                                    <option value="1">Ca 1 班1</option><option value="2">Ca 2 班2</option><option value="3">Ca 3 班3</option>
+                                    <option value="1">Ca 1 班1</option><option value="2">Ca 2 班2</option><option value="3">Ca 3 班3</option><option value="end">Kết ca 結班</option>
                                 </select>
                             </div>
                             <div style="padding:6px 12px;background:var(--primary-light);border-radius:8px;font-size:12px;font-weight:600;color:var(--primary)" id="revCheckerBadge"></div>
@@ -542,7 +542,7 @@
                     <input type="date" id="rev-filter-to" onchange="renderRevenueSummary()" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
                     <div style="width:1px;height:20px;background:var(--border);margin:0 2px"></div>
                     <select id="rev-filter-shift" onchange="renderRevenueSummary()" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
-                        <option value="">Tất cả ca 全部班次</option><option value="1">Ca 1 班1</option><option value="2">Ca 2 班2</option><option value="3">Ca 3 班3</option>
+                        <option value="">Tất cả ca 全部班次</option><option value="1">Ca 1 班1</option><option value="2">Ca 2 班2</option><option value="3">Ca 3 班3</option><option value="end">Kết ca 結班</option>
                     </select>
                     <select id="rev-filter-user" onchange="renderRevenueSummary()" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
                         <option value="">Tất cả người 全部人員</option>
@@ -651,7 +651,7 @@
                     <div class="form-group"><label>NGÀY 日期</label><input type="date" id="ho-date" onchange="renderHandoverCalc()"></div>
                     <div class="form-group"><label>CA NHẬN 接班</label>
                         <select id="ho-shift-type" style="padding:9px 8px;font-size:12px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit">
-                            <option value="2">Ca 2 班2</option><option value="3">Ca 3 班3</option><option value="4">Ca 4 班4</option><option value="5">Ca 5 班5</option>
+                            <option value="1">Ca 1 班1</option><option value="2">Ca 2 班2</option><option value="3">Ca 3 班3</option><option value="end">Kết ca 結班</option>
                         </select>
                     </div>
                     <div class="form-group"><label>NGƯỜI GIAO 交班人</label><input type="text" id="ho-from" placeholder="Tên người giao ca trước..."></div>
@@ -1067,7 +1067,7 @@
         <div id="editRevInfo" style="margin-bottom:12px;padding:8px 12px;background:var(--bg-secondary);border-radius:8px;font-size:12px;color:var(--text-muted)"></div>
         <div class="form-row">
             <div class="form-group"><label>Ngày 日期</label><input type="date" id="editrev-date"></div>
-            <div class="form-group"><label>Ca 班次</label><select id="editrev-shift"><option value="1">Ca 1 班1</option><option value="2">Ca 2 班2</option><option value="3">Ca 3 班3</option></select></div>
+            <div class="form-group"><label>Ca 班次</label><select id="editrev-shift"><option value="1">Ca 1 班1</option><option value="2">Ca 2 班2</option><option value="3">Ca 3 班3</option><option value="end">Kết ca 結班</option></select></div>
         </div>
         <div class="form-row">
             <div class="form-group"><label>TM đầu ca 現金開班</label><input type="text" id="editrev-cash1" oninput="calcEditRev()"></div>
@@ -1985,7 +1985,7 @@ function renderRevenueSummary(){
     if(fUser)data=data.filter(r=>(r.displayName||r.checker||r.user)===fUser);
 
     data.sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt?.localeCompare(a.createdAt));
-    const shiftLabel={'1':'Ca1 班1','2':'Ca2 班2','3':'Ca3 班3',1:'Ca1 班1',2:'Ca2 班2',3:'Ca3 班3'};
+    const shiftLabel={'1':'Ca1 班1','2':'Ca2 班2','3':'Ca3 班3','end':'Kết ca 結班',1:'Ca1 班1',2:'Ca2 班2',3:'Ca3 班3'};
     let grandTotal=0;
     const tbody=document.getElementById('revSummaryBody');
     tbody.innerHTML=data.map((r,i)=>{
@@ -2482,7 +2482,7 @@ function confirmShift(id,role){
 }
 function renderShiftHistory(){
     const shifts=(gs(SK.shifts)||[]).slice(-20).reverse();
-    const sl={1:'Ca1',2:'Ca2',3:'Ca3'};
+    const sl={1:'Ca1',2:'Ca2',3:'Ca3','end':'Kết ca'};
     const container=document.getElementById('shiftHistoryContainer');
     if(!shifts.length){container.innerHTML='<div style="text-align:center;color:var(--text-muted);padding:16px;font-size:12px">Chưa có lịch sử giao ca</div>';return}
     container.innerHTML=shifts.map(s=>{
@@ -2539,7 +2539,7 @@ function showShiftDetail(id){
     const shifts=gs(SK.shifts)||[];
     const s=shifts.find(x=>x.id===id);if(!s)return;
     const isOpen=s.type==='open'||(!s.type&&s.shiftType==='1');
-    const sl={1:'Ca 1',2:'Ca 2',3:'Ca 3',4:'Ca 4',5:'Ca 5'};
+    const sl={1:'Ca 1',2:'Ca 2',3:'Ca 3','end':'Kết ca',4:'Ca 4',5:'Ca 5'};
     const time=s.createdAt?new Date(s.createdAt).toLocaleTimeString('vi',{hour:'2-digit',minute:'2-digit'}):'';
     let html=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <h3 style="margin:0">${isOpen?'🟢 Mở ca':'🔄 Nhận bàn giao'} — ${sl[s.shiftType]||''}</h3>
@@ -2756,7 +2756,7 @@ function getShiftPeriodData(shifts,date){
 function renderShiftDaySummary(){
     const today=new Date().toISOString().split('T')[0];
     const b=getShiftBalance(today);
-    const sl={1:'Ca 1',2:'Ca 2',3:'Ca 3',4:'Ca 4',5:'Ca 5'};
+    const sl={1:'Ca 1',2:'Ca 2',3:'Ca 3','end':'Kết ca',4:'Ca 4',5:'Ca 5'};
     const el=document.getElementById('shiftDaySummary');
     const periodData=getShiftPeriodData(b.allShifts,today);
     // Per-shift rows with expandable detail
@@ -4401,7 +4401,6 @@ function renderAccounts(){
     const users=gs(SK.users)||[];
     const rl={boss:'Boss',leader:'Leader',staff:'Nhân viên'};
     document.getElementById('accountsBody').innerHTML=users.map(u=>`<tr><td>${u.username}</td><td>${u.displayName}</td><td><span class="badge ${u.role==='boss'?'badge-warning':'badge-success'}">${rl[u.role]}</span></td><td style="white-space:nowrap"><button class="btn btn-outline btn-xs" style="margin-right:4px" onclick="showEditUser('${u.username}')">✏️ Sửa</button><button class="btn btn-primary btn-xs" style="margin-right:4px" onclick="showResetPassword('${u.username}')">🔑 Reset MK</button><button class="btn btn-danger btn-xs" onclick="deleteUser('${u.username}')">🗑 Xóa</button></td></tr>`).join('');
-    // Populate gsheet URL
     const urlInp=document.getElementById('gsheet-url-input');
     if(urlInp){const saved=localStorage.getItem('qg_gsheet_url')||'';urlInp.value=saved;
         const st=document.getElementById('gsheetStatus');
@@ -4444,14 +4443,9 @@ function testSheetConnection(){
     if(!url){st.innerHTML='<span style="color:var(--danger)">Chưa có URL!</span>';return}
     st.innerHTML='<span style="color:var(--warning)">Đang test...</span>';
     fetch(url+'?action=ping').then(r=>r.json()).then(data=>{
-        if(data.status==='ok'){
-            st.innerHTML='<span style="color:var(--success)">✓ Kết nối thành công! Sheet sẵn sàng.</span>';
-        }else{
-            st.innerHTML='<span style="color:var(--warning)">⚠ Phản hồi không đúng format: '+JSON.stringify(data)+'</span>';
-        }
-    }).catch(err=>{
-        st.innerHTML='<span style="color:var(--danger)">✗ Lỗi: '+err.message+'</span>';
-    });
+        if(data.status==='ok'){st.innerHTML='<span style="color:var(--success)">✓ Kết nối thành công! Sheet sẵn sàng.</span>'}
+        else{st.innerHTML='<span style="color:var(--warning)">⚠ Phản hồi không đúng format: '+JSON.stringify(data)+'</span>'}
+    }).catch(err=>{st.innerHTML='<span style="color:var(--danger)">✗ Lỗi: '+err.message+'</span>'});
 }
 function syncUsersOnly(){
     const url=localStorage.getItem('qg_gsheet_url');
@@ -4462,51 +4456,26 @@ function syncUsersOnly(){
     st.innerHTML='<span style="color:var(--warning)">⏳ Đang gửi '+users.length+' tài khoản...</span>';
     fetch(url,{method:'POST',body:JSON.stringify({action:'write',type:'user',records:users}),headers:{'Content-Type':'text/plain'}})
     .then(r=>r.json()).then(data=>{
-        if(data.status==='ok'){
-            st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ '+users.length+' tài khoản lên Sheet!</span>';
-            showToast('✓ Đồng bộ tài khoản thành công!');
-        }else{
-            st.innerHTML='<span style="color:var(--danger)">Lỗi: '+JSON.stringify(data)+'</span>';
-        }
-    }).catch(err=>{
-        st.innerHTML='<span style="color:var(--danger)">Lỗi kết nối: '+err.message+'</span>';
-    });
+        if(data.status==='ok'){st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ '+users.length+' tài khoản lên Sheet!</span>';showToast('✓ Đồng bộ tài khoản thành công!')}
+        else{st.innerHTML='<span style="color:var(--danger)">Lỗi: '+JSON.stringify(data)+'</span>'}
+    }).catch(err=>{st.innerHTML='<span style="color:var(--danger)">Lỗi kết nối: '+err.message+'</span>'});
 }
 function syncAllToSheet(){
     const url=localStorage.getItem('qg_gsheet_url');
     if(!url){showToast('Chưa cài đặt URL Google Sheet!');return}
     if(!confirm('Đồng bộ TOÀN BỘ dữ liệu lên Google Sheet?\n(Dữ liệu trùng ID sẽ tự động bỏ qua)\n\nQuá trình có thể mất 1-2 phút, vui lòng chờ.'))return;
-    const exps=gs(SK.expenses)||[];
-    const revs=gs(SK.revenues)||[];
-    const shifts=gs(SK.shifts)||[];
-    const topups=gs('qg_topups')||[];
-    const users=gs(SK.users)||[];
+    const exps=gs(SK.expenses)||[];const revs=gs(SK.revenues)||[];const shifts=gs(SK.shifts)||[];const topups=gs('qg_topups')||[];const users=gs(SK.users)||[];
     const queue=[];
-    const addBatches=(type,data)=>{
-        for(let i=0;i<data.length;i+=20){
-            queue.push({type,batch:data.slice(i,i+20)});
-        }
-    };
-    addBatches('user',users);
-    addBatches('expense',exps);
-    addBatches('revenue',revs);
-    addBatches('shift',shifts);
-    addBatches('topup',topups);
+    const addBatches=(type,data)=>{for(let i=0;i<data.length;i+=20){queue.push({type,batch:data.slice(i,i+20)})}};
+    addBatches('user',users);addBatches('expense',exps);addBatches('revenue',revs);addBatches('shift',shifts);addBatches('topup',topups);
     const total=exps.length+revs.length+shifts.length+topups.length+users.length;
-    const totalBatches=queue.length;
-    let sent=0;
+    const totalBatches=queue.length;let sent=0;
     const st=document.getElementById('gsheetStatus');
     st.innerHTML='<span style="color:var(--warning)">⏳ Đang đồng bộ 0/'+totalBatches+' batch ('+total+' bản ghi)...</span>';
     showToast('Bắt đầu đồng bộ '+total+' bản ghi... Vui lòng chờ!');
     function sendNext(){
-        if(sent>=queue.length){
-            st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ xong '+total+' bản ghi!</span>';
-            showToast('✓ Đồng bộ hoàn tất!');
-            return;
-        }
-        const item=queue[sent];
-        syncToSheet(item.type,item.batch);
-        sent++;
+        if(sent>=queue.length){st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ xong '+total+' bản ghi!</span>';showToast('✓ Đồng bộ hoàn tất!');return}
+        const item=queue[sent];syncToSheet(item.type,item.batch);sent++;
         st.innerHTML='<span style="color:var(--warning)">⏳ Đang gửi '+sent+'/'+totalBatches+' batch...</span>';
         setTimeout(sendNext,3000);
     }
@@ -4521,16 +4490,11 @@ function importExcelData(input){
         try{
             const data=JSON.parse(e.target.result);
             if(!data.expenses&&!data.revenues){showToast('File không hợp lệ!');return}
-            const existExp=gs(SK.expenses)||[];
-            const existRev=gs(SK.revenues)||[];
-            const keepExp=existExp.filter(x=>x.source!=='excel');
-            const keepRev=existRev.filter(x=>x.source!=='excel');
-            const newExp=data.expenses||[];
-            const newRev=data.revenues||[];
-            ss(SK.expenses,[...keepExp,...newExp]);
-            ss(SK.revenues,[...keepRev,...newRev]);
-            if(newExp.length)syncToSheet('expense',newExp);
-            if(newRev.length)syncToSheet('revenue',newRev);
+            const existExp=gs(SK.expenses)||[];const existRev=gs(SK.revenues)||[];
+            const keepExp=existExp.filter(x=>x.source!=='excel');const keepRev=existRev.filter(x=>x.source!=='excel');
+            const newExp=data.expenses||[];const newRev=data.revenues||[];
+            ss(SK.expenses,[...keepExp,...newExp]);ss(SK.revenues,[...keepRev,...newRev]);
+            if(newExp.length)syncToSheet('expense',newExp);if(newRev.length)syncToSheet('revenue',newRev);
             const el=document.getElementById('importStatus');
             el.innerHTML=`<span style="color:var(--success);font-weight:700">✅ Đã nhập thành công!</span><br>Chi tiêu: ${newExp.length} khoản | Doanh thu: ${newRev.length} ngày<br><span style="font-size:10px">(Dữ liệu nhập tay trước đó vẫn được giữ nguyên)</span>`;
             showToast(`Nhập thành công: ${newExp.length} chi tiêu + ${newRev.length} doanh thu`);
@@ -4539,13 +4503,7 @@ function importExcelData(input){
     reader.readAsText(file);input.value='';
 }
 function exportAllData(){
-    const data={
-        expenses:gs(SK.expenses)||[],
-        revenues:gs(SK.revenues)||[],
-        shifts:gs(SK.shifts)||[],
-        topups:gs('qg_topups')||[],
-        exportedAt:new Date().toISOString()
-    };
+    const data={expenses:gs(SK.expenses)||[],revenues:gs(SK.revenues)||[],shifts:gs(SK.shifts)||[],topups:gs('qg_topups')||[],exportedAt:new Date().toISOString()};
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);
     a.download='quach-gia-backup-'+new Date().toISOString().split('T')[0]+'.json';
@@ -4553,17 +4511,12 @@ function exportAllData(){
 }
 function clearImportedData(){
     if(!confirm('Xóa tất cả dữ liệu nhập từ Excel? (Dữ liệu nhập tay sẽ giữ nguyên)'))return;
-    const keepExp=(gs(SK.expenses)||[]).filter(x=>x.source!=='excel');
-    const keepRev=(gs(SK.revenues)||[]).filter(x=>x.source!=='excel');
-    const delExpIds=(gs(SK.expenses)||[]).filter(x=>x.source==='excel').map(x=>x.id);
-    const delRevIds=(gs(SK.revenues)||[]).filter(x=>x.source==='excel').map(x=>x.id);
-    const removedExp=delExpIds.length;
-    const removedRev=delRevIds.length;
+    const keepExp=(gs(SK.expenses)||[]).filter(x=>x.source!=='excel');const keepRev=(gs(SK.revenues)||[]).filter(x=>x.source!=='excel');
+    const delExpIds=(gs(SK.expenses)||[]).filter(x=>x.source==='excel').map(x=>x.id);const delRevIds=(gs(SK.revenues)||[]).filter(x=>x.source==='excel').map(x=>x.id);
     ss(SK.expenses,keepExp);ss(SK.revenues,keepRev);
-    if(delExpIds.length)syncDeleteFromSheet('expense',delExpIds);
-    if(delRevIds.length)syncDeleteFromSheet('revenue',delRevIds);
-    document.getElementById('importStatus').innerHTML=`<span style="color:var(--danger)">🗑 Đã xóa ${removedExp} chi tiêu + ${removedRev} doanh thu từ Excel</span>`;
-    showToast(`Đã xóa ${removedExp+removedRev} bản ghi Excel`);
+    if(delExpIds.length)syncDeleteFromSheet('expense',delExpIds);if(delRevIds.length)syncDeleteFromSheet('revenue',delRevIds);
+    document.getElementById('importStatus').innerHTML=`<span style="color:var(--danger)">🗑 Đã xóa ${delExpIds.length} chi tiêu + ${delRevIds.length} doanh thu từ Excel</span>`;
+    showToast(`Đã xóa ${delExpIds.length+delRevIds.length} bản ghi Excel`);
 }
 
 // ========== HISTORY ==========
@@ -4591,21 +4544,20 @@ function showToast(msg){
 // ========== FILE ATTACHMENT ==========
 const attachments={};
 function handleAttach(id,input){
-    const files=input.files;
-    if(!files.length)return;
+    const files=input.files;if(!files.length)return;
     attachments[id]=[];
     Array.from(files).forEach(f=>{
         const reader=new FileReader();
         reader.onload=function(ev){
             attachments[id].push({name:f.name,type:f.type,data:ev.target.result});
             const info=document.getElementById('attach-info-'+id);
-            if(info){info.style.display='inline';info.textContent='✓ '+attachments[id].length+' file';}
+            if(info){info.style.display='inline';info.textContent='✓ '+attachments[id].length+' file'}
         };
         reader.readAsDataURL(f);
     });
 }
 
-// ========== CATEGORY DETAIL (click on category in table) ==========
+// ========== CATEGORY DETAIL ==========
 function showCatDetail(category){
     const exps=(gs(SK.expenses)||[]).filter(e=>e.category===category);
     const total=exps.reduce((s,e)=>s+e.amount,0);
@@ -4625,23 +4577,14 @@ function showCatDetail(category){
 // ========== EXPENSE TRACKER DASHBOARD ==========
 const catColors=['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#6366f1','#14b8a6','#e11d48','#a855f7','#0ea5e9','#eab308'];
 function renderExpenseTracker(){
-    const exps=gs(SK.expenses)||[];
-    const today=new Date();
-    const todayStr=today.toISOString().split('T')[0];
-    const m=today.getMonth(),y=today.getFullYear();
-    const isBoss=currentUser?.role==='boss';
-
-    // Today's total
+    const exps=gs(SK.expenses)||[];const today=new Date();const todayStr=today.toISOString().split('T')[0];
+    const m=today.getMonth(),y=today.getFullYear();const isBoss=currentUser?.role==='boss';
     const todayTotal=exps.filter(e=>e.date===todayStr).reduce((s,e)=>s+e.amount,0);
-    // This month's total
     const monthExps=exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y});
     const monthTotal=monthExps.reduce((s,e)=>s+e.amount,0);
-    const monthDays=new Set(monthExps.map(e=>e.date)).size;
-    const avgDay=monthDays>0?monthTotal/monthDays:0;
-
+    const monthDays=new Set(monthExps.map(e=>e.date)).size;const avgDay=monthDays>0?monthTotal/monthDays:0;
     if(!isBoss){
-        document.getElementById('trackerStats').innerHTML=`
-            <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="label">Chi hôm nay 今日支出</div><div class="value negative">${fmt(todayTotal)}</div></div>`;
+        document.getElementById('trackerStats').innerHTML=`<div class="stat-card" style="border-left:3px solid var(--danger)"><div class="label">Chi hôm nay 今日支出</div><div class="value negative">${fmt(todayTotal)}</div></div>`;
     } else {
         document.getElementById('trackerStats').innerHTML=`
             <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="label">Chi hôm nay 今日支出</div><div class="value negative">${fmt(todayTotal)}</div></div>
@@ -4649,52 +4592,20 @@ function renderExpenseTracker(){
             <div class="stat-card" style="border-left:3px solid var(--primary)"><div class="label">TB/ngày 日均</div><div class="value">${fmt(Math.round(avgDay))}</div></div>
             <div class="stat-card" style="border-left:3px solid var(--purple)"><div class="label">Số khoản tháng 本月筆數</div><div class="value">${monthExps.length}</div></div>`;
     }
-
     if(!isBoss){
-        document.getElementById('trackerChart7d').innerHTML='';
-        document.getElementById('trackerChart7dLabels').innerHTML='';
-        document.getElementById('trackerCategoryList').innerHTML='';
-        const tGrid=document.querySelector('.tracker-grid');
-        if(tGrid)tGrid.style.display='none';
-        return;
+        document.getElementById('trackerChart7d').innerHTML='';document.getElementById('trackerChart7dLabels').innerHTML='';document.getElementById('trackerCategoryList').innerHTML='';
+        const tGrid=document.querySelector('.tracker-grid');if(tGrid)tGrid.style.display='none';return;
     }
-    const tGrid2=document.querySelector('.tracker-grid');
-    if(tGrid2)tGrid2.style.display='';
-
-    // 7-day bar chart
-    const chart=document.getElementById('trackerChart7d');
-    const labels=document.getElementById('trackerChart7dLabels');
-    const days=[];
-    for(let i=6;i>=0;i--){
-        const d=new Date(today);d.setDate(d.getDate()-i);
-        const ds=d.toISOString().split('T')[0];
-        const dayTotal=exps.filter(e=>e.date===ds).reduce((s,e)=>s+e.amount,0);
-        days.push({date:ds,total:dayTotal,label:(d.getDate())+'/'+(d.getMonth()+1)});
-    }
+    const tGrid2=document.querySelector('.tracker-grid');if(tGrid2)tGrid2.style.display='';
+    const chart=document.getElementById('trackerChart7d');const labels=document.getElementById('trackerChart7dLabels');const days=[];
+    for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);const ds=d.toISOString().split('T')[0];const dayTotal=exps.filter(e=>e.date===ds).reduce((s,e)=>s+e.amount,0);days.push({date:ds,total:dayTotal,label:(d.getDate())+'/'+(d.getMonth()+1)})}
     const maxVal=Math.max(...days.map(d=>d.total),1);
-    chart.innerHTML=days.map(d=>{
-        const h=Math.max((d.total/maxVal)*180,2);
-        const isToday=d.date===todayStr;
-        return `<div class="tracker-bar" style="height:${h}px;background:${isToday?'var(--danger)':'var(--primary)'}" title="${d.label}: ${fmtNum(d.total)} ₫">
-            <div class="bar-tip">${d.label}: ${fmtNum(d.total)} ₫</div>
-        </div>`;
-    }).join('');
+    chart.innerHTML=days.map(d=>{const h=Math.max((d.total/maxVal)*180,2);const isToday=d.date===todayStr;return `<div class="tracker-bar" style="height:${h}px;background:${isToday?'var(--danger)':'var(--primary)'}" title="${d.label}: ${fmtNum(d.total)} ₫"><div class="bar-tip">${d.label}: ${fmtNum(d.total)} ₫</div></div>`}).join('');
     labels.innerHTML=days.map(d=>`<span>${d.label}</span>`).join('');
-
-    // Category breakdown (this month)
     const byCat={};monthExps.forEach(e=>{byCat[e.category]=(byCat[e.category]||0)+e.amount});
     const catList=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
     const catContainer=document.getElementById('trackerCategoryList');
-    catContainer.innerHTML=catList.map(([cat,amt],i)=>{
-        const pct=monthTotal>0?(amt/monthTotal*100):0;
-        const color=catColors[i%catColors.length];
-        return `<div class="tracker-cat-row" style="cursor:pointer" onclick="showCatDetail('${escHtml(cat).replace(/'/g,"\\'")}')">
-            <span style="min-width:100px;font-weight:600;color:${color}">${escHtml(cat.split(' ')[0])}</span>
-            <div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-            <span class="amount-display" style="min-width:90px;text-align:right;font-weight:700">${fmtNum(amt)}</span>
-            <span style="min-width:40px;text-align:right;color:var(--text-muted)">${pct.toFixed(0)}%</span>
-        </div>`;
-    }).join('');
+    catContainer.innerHTML=catList.map(([cat,amt],i)=>{const pct=monthTotal>0?(amt/monthTotal*100):0;const color=catColors[i%catColors.length];return `<div class="tracker-cat-row" style="cursor:pointer" onclick="showCatDetail('${escHtml(cat).replace(/'/g,"\\'")}')"><span style="min-width:100px;font-weight:600;color:${color}">${escHtml(cat.split(' ')[0])}</span><div class="cat-bar-bg"><div class="cat-bar-fill" style="width:${pct}%;background:${color}"></div></div><span class="amount-display" style="min-width:90px;text-align:right;font-weight:700">${fmtNum(amt)}</span><span style="min-width:40px;text-align:right;color:var(--text-muted)">${pct.toFixed(0)}%</span></div>`}).join('');
     if(catList.length===0)catContainer.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Chưa có dữ liệu tháng này 本月暫無數據</div>';
 }
 
