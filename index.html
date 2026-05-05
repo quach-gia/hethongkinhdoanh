@@ -191,9 +191,9 @@
         .tooltip:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:4px 10px;border-radius:6px;font-size:11px;white-space:nowrap;z-index:99;pointer-events:none}
 
         /* ===== MODAL ===== */
-        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:20px}
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch}
         .modal-overlay.open{display:flex}
-        .modal{background:#fff;border-radius:var(--radius-lg);padding:28px;max-width:440px;width:100%;box-shadow:var(--shadow-lg)}
+        .modal{background:#fff;border-radius:var(--radius-lg);padding:28px;max-width:440px;width:100%;box-shadow:var(--shadow-lg);margin:auto 0}
         .modal h3{margin-bottom:16px;font-size:17px}
 
         /* ===== RESPONSIVE ===== */
@@ -4380,7 +4380,6 @@ function showResetPassword(username){
     document.getElementById('rp-new').value='';
     document.getElementById('rp-confirm').value='';
     document.getElementById('rpAlert').innerHTML='';
-    document.getElementById('rpAlert').innerHTML='';
     document.getElementById('modalResetPass').classList.add('open');
     document.getElementById('modalResetPass').dataset.user=username;
 }
@@ -4482,14 +4481,13 @@ function syncAllToSheet(){
     const shifts=gs(SK.shifts)||[];
     const topups=gs('qg_topups')||[];
     const users=gs(SK.users)||[];
-    // Build queue: split all data into small batches, send one at a time
     const queue=[];
     const addBatches=(type,data)=>{
         for(let i=0;i<data.length;i+=20){
             queue.push({type,batch:data.slice(i,i+20)});
         }
     };
-    addBatches('user',users); // Users first so login works
+    addBatches('user',users);
     addBatches('expense',exps);
     addBatches('revenue',revs);
     addBatches('shift',shifts);
@@ -4500,7 +4498,6 @@ function syncAllToSheet(){
     const st=document.getElementById('gsheetStatus');
     st.innerHTML='<span style="color:var(--warning)">⏳ Đang đồng bộ 0/'+totalBatches+' batch ('+total+' bản ghi)...</span>';
     showToast('Bắt đầu đồng bộ '+total+' bản ghi... Vui lòng chờ!');
-    // Send one batch at a time with 3s delay
     function sendNext(){
         if(sent>=queue.length){
             st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ xong '+total+' bản ghi!</span>';
@@ -4526,7 +4523,6 @@ function importExcelData(input){
             if(!data.expenses&&!data.revenues){showToast('File không hợp lệ!');return}
             const existExp=gs(SK.expenses)||[];
             const existRev=gs(SK.revenues)||[];
-            // Remove old imported data (source=excel) before re-importing
             const keepExp=existExp.filter(x=>x.source!=='excel');
             const keepRev=existRev.filter(x=>x.source!=='excel');
             const newExp=data.expenses||[];
@@ -4644,7 +4640,6 @@ function renderExpenseTracker(){
     const avgDay=monthDays>0?monthTotal/monthDays:0;
 
     if(!isBoss){
-        // Staff/Leader: only show today's total
         document.getElementById('trackerStats').innerHTML=`
             <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="label">Chi hôm nay 今日支出</div><div class="value negative">${fmt(todayTotal)}</div></div>`;
     } else {
@@ -4655,12 +4650,10 @@ function renderExpenseTracker(){
             <div class="stat-card" style="border-left:3px solid var(--purple)"><div class="label">Số khoản tháng 本月筆數</div><div class="value">${monthExps.length}</div></div>`;
     }
 
-    // Hide charts and category breakdown for non-boss
     if(!isBoss){
         document.getElementById('trackerChart7d').innerHTML='';
         document.getElementById('trackerChart7dLabels').innerHTML='';
         document.getElementById('trackerCategoryList').innerHTML='';
-        // Hide the tracker-grid
         const tGrid=document.querySelector('.tracker-grid');
         if(tGrid)tGrid.style.display='none';
         return;
@@ -4707,11 +4700,9 @@ function renderExpenseTracker(){
 
 // ========== INIT ==========
 initData();
-// Show cached data immediately, fetch in background (stale-while-revalidate)
 checkSession();
 if(getSheetUrl()){
     loadFromSheet(function(ok){
-        // Re-render current page with fresh data
         if(ok&&currentUser){
             const activeEl=document.querySelector('.nav-item.active');
             if(activeEl)navigateTo(activeEl.dataset.page);
