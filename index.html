@@ -273,7 +273,10 @@
     <div class="mobile-header">
         <span style="font-size:22px;cursor:pointer" onclick="toggleSidebar()">☰</span>
         <span style="font-weight:700">Quách Gia</span>
-        <span onclick="doLogout()" style="cursor:pointer;font-size:14px">Đăng xuất</span>
+        <div style="display:flex;gap:12px;align-items:center">
+            <span onclick="refreshFromSheet()" style="cursor:pointer;font-size:18px" title="Đồng bộ dữ liệu 同步數據">🔄</span>
+            <span onclick="doLogout()" style="cursor:pointer;font-size:14px">Đăng xuất</span>
+        </div>
     </div>
 
     <div class="sidebar" id="sidebar">
@@ -1099,11 +1102,11 @@ function syncDeleteFromSheet(type, ids){
 }
 
 // LOAD ALL data from Sheet → localStorage
-function loadFromSheet(callback){
+function loadFromSheet(callback,silent){
     const url=getSheetUrl();
     if(!url){if(callback)callback(false);return}
     cloudLoading=true;
-    showToast('Đang tải dữ liệu từ Google Sheet... ⏳');
+    if(!silent)showToast('Đang tải dữ liệu từ Google Sheet... ⏳');
     fetch(url+'?action=all')
     .then(r=>r.json())
     .then(data=>{
@@ -1114,7 +1117,7 @@ function loadFromSheet(callback){
             if(data.topups&&data.topups.length) ss('qg_topups',data.topups);
             if(data.users&&data.users.length) ss(SK.users,data.users);
             cloudReady=true;
-            showToast('✓ Đã tải dữ liệu từ Sheet!');
+            if(!silent)showToast('✓ Đã tải dữ liệu từ Sheet!');
             console.log('Cloud loaded: '+
                 (data.expenses||[]).length+'exp, '+
                 (data.revenues||[]).length+'rev, '+
@@ -1122,18 +1125,41 @@ function loadFromSheet(callback){
                 (data.topups||[]).length+'topup, '+
                 (data.users||[]).length+'user');
         }else{
-            showToast('⚠ Lỗi tải Sheet: '+(data.message||''));
+            if(!silent)showToast('⚠ Lỗi tải Sheet: '+(data.message||''));
         }
         cloudLoading=false;
         if(callback)callback(cloudReady);
     })
     .catch(err=>{
         console.warn('Load from Sheet error:',err);
-        showToast('⚠ Không kết nối được Sheet. Dùng dữ liệu local.');
+        if(!silent)showToast('⚠ Không kết nối được Sheet. Dùng dữ liệu local.');
         cloudLoading=false;
         if(callback)callback(false);
     });
 }
+
+// Manual refresh from Sheet + re-render current page
+function refreshFromSheet(){
+    showToast('Đang đồng bộ dữ liệu... 🔄');
+    loadFromSheet(function(ok){
+        if(ok&&currentUser){
+            const activeEl=document.querySelector('.nav-item.active');
+            if(activeEl)navigateTo(activeEl.dataset.page);
+            showToast('✓ Dữ liệu đã cập nhật!');
+        }
+    });
+}
+
+// Auto-refresh every 60 seconds (silent)
+setInterval(function(){
+    if(!currentUser||!getSheetUrl())return;
+    loadFromSheet(function(ok){
+        if(ok&&currentUser){
+            const activeEl=document.querySelector('.nav-item.active');
+            if(activeEl)navigateTo(activeEl.dataset.page);
+        }
+    },true);
+},60000);
 
 // Sync users to Sheet (for login across devices)
 function syncUsersToSheet(){
@@ -4371,7 +4397,6 @@ function syncAllToSheet(){
     const st=document.getElementById('gsheetStatus');
     st.innerHTML='<span style="color:var(--warning)">⏳ Đang đồng bộ 0/'+totalBatches+' batch ('+total+' bản ghi)...</span>';
     showToast('Bắt đầu đồng bộ '+total+' bản ghi... Vui lòng chờ!');
-    // Send one batch at a time with 3s delay
     function sendNext(){
         if(sent>=queue.length){
             st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ xong '+total+' bản ghi!</span>';
