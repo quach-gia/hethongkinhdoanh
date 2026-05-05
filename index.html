@@ -1136,6 +1136,8 @@ function loadFromSheet(callback,silent){
         if(callback)callback(cloudReady);
     });
 }
+// Auto-refresh every 2 minutes in background (keep data fresh without reload)
+setInterval(function(){if(getSheetUrl()&&currentUser&&!cloudLoading)loadFromSheet(function(ok){if(ok){const a=document.querySelector('.nav-item.active');if(a)navigateTo(a.dataset.page)}},true)},120000);
 
 // Manual refresh from Sheet + re-render current page
 function refreshFromSheet(){
@@ -4396,6 +4398,7 @@ function syncAllToSheet(){
     const st=document.getElementById('gsheetStatus');
     st.innerHTML='<span style="color:var(--warning)">⏳ Đang đồng bộ 0/'+totalBatches+' batch ('+total+' bản ghi)...</span>';
     showToast('Bắt đầu đồng bộ '+total+' bản ghi... Vui lòng chờ!');
+    // Send one batch at a time with 3s delay
     function sendNext(){
         if(sent>=queue.length){
             st.innerHTML='<span style="color:var(--success)">✓ Đã đồng bộ xong '+total+' bản ghi!</span>';
@@ -4421,6 +4424,7 @@ function importExcelData(input){
             if(!data.expenses&&!data.revenues){showToast('File không hợp lệ!');return}
             const existExp=gs(SK.expenses)||[];
             const existRev=gs(SK.revenues)||[];
+            // Remove old imported data (source=excel) before re-importing
             const keepExp=existExp.filter(x=>x.source!=='excel');
             const keepRev=existRev.filter(x=>x.source!=='excel');
             const newExp=data.expenses||[];
@@ -4503,7 +4507,7 @@ function handleAttach(id,input){
     });
 }
 
-// ========== CATEGORY DETAIL ==========
+// ========== CATEGORY DETAIL (click on category in table) ==========
 function showCatDetail(category){
     const exps=(gs(SK.expenses)||[]).filter(e=>e.category===category);
     const total=exps.reduce((s,e)=>s+e.amount,0);
@@ -4528,12 +4532,17 @@ function renderExpenseTracker(){
     const todayStr=today.toISOString().split('T')[0];
     const m=today.getMonth(),y=today.getFullYear();
     const isBoss=currentUser?.role==='boss';
+
+    // Today's total
     const todayTotal=exps.filter(e=>e.date===todayStr).reduce((s,e)=>s+e.amount,0);
+    // This month's total
     const monthExps=exps.filter(e=>{const d=new Date(e.date);return d.getMonth()===m&&d.getFullYear()===y});
     const monthTotal=monthExps.reduce((s,e)=>s+e.amount,0);
     const monthDays=new Set(monthExps.map(e=>e.date)).size;
     const avgDay=monthDays>0?monthTotal/monthDays:0;
+
     if(!isBoss){
+        // Staff/Leader: only show today's total
         document.getElementById('trackerStats').innerHTML=`
             <div class="stat-card" style="border-left:3px solid var(--danger)"><div class="label">Chi hôm nay 今日支出</div><div class="value negative">${fmt(todayTotal)}</div></div>`;
     } else {
@@ -4543,16 +4552,21 @@ function renderExpenseTracker(){
             <div class="stat-card" style="border-left:3px solid var(--primary)"><div class="label">TB/ngày 日均</div><div class="value">${fmt(Math.round(avgDay))}</div></div>
             <div class="stat-card" style="border-left:3px solid var(--purple)"><div class="label">Số khoản tháng 本月筆數</div><div class="value">${monthExps.length}</div></div>`;
     }
+
+    // Hide charts and category breakdown for non-boss
     if(!isBoss){
         document.getElementById('trackerChart7d').innerHTML='';
         document.getElementById('trackerChart7dLabels').innerHTML='';
         document.getElementById('trackerCategoryList').innerHTML='';
+        // Hide the tracker-grid
         const tGrid=document.querySelector('.tracker-grid');
         if(tGrid)tGrid.style.display='none';
         return;
     }
     const tGrid2=document.querySelector('.tracker-grid');
     if(tGrid2)tGrid2.style.display='';
+
+    // 7-day bar chart
     const chart=document.getElementById('trackerChart7d');
     const labels=document.getElementById('trackerChart7dLabels');
     const days=[];
@@ -4571,6 +4585,8 @@ function renderExpenseTracker(){
         </div>`;
     }).join('');
     labels.innerHTML=days.map(d=>`<span>${d.label}</span>`).join('');
+
+    // Category breakdown (this month)
     const byCat={};monthExps.forEach(e=>{byCat[e.category]=(byCat[e.category]||0)+e.amount});
     const catList=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
     const catContainer=document.getElementById('trackerCategoryList');
@@ -4589,16 +4605,16 @@ function renderExpenseTracker(){
 
 // ========== INIT ==========
 initData();
+// Show cached data immediately, fetch in background (stale-while-revalidate)
+checkSession();
 if(getSheetUrl()){
     loadFromSheet(function(ok){
-        checkSession();
-        if(currentUser){
+        // Re-render current page with fresh data
+        if(ok&&currentUser){
             const activeEl=document.querySelector('.nav-item.active');
             if(activeEl)navigateTo(activeEl.dataset.page);
         }
-    });
-}else{
-    checkSession();
+    },true);
 }
 </script>
 </body>
