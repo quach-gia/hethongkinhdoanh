@@ -873,6 +873,24 @@
             </div>
         </div>
 
+        <!-- ===================== PAGE: DÒNG TIỀN 現金流 ===================== -->
+        <div class="page" id="page-dongtien">
+            <div class="page-header"><h2>Dòng Tiền <span class="zh">現金流</span></h2></div>
+            <div class="filter-bar" style="gap:8px;flex-wrap:wrap">
+                <select id="cashflow-year" onchange="renderCashFlow()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="2026" selected>2026</option><option value="2025">2025</option></select>
+            </div>
+            <div id="cashflowTipReport" style="margin-bottom:12px"></div>
+            <div id="cashflowCards" style="margin-bottom:12px"></div>
+            <div class="card" style="padding:0;overflow:hidden">
+                <div style="padding:10px 14px;font-weight:700;font-size:13px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1">Đối chiếu tiền mặt <span style="font-size:11px;font-weight:400;color:var(--text-muted)">現金對帳</span></div>
+                <div id="cashflowCashTable" style="overflow-x:auto"></div>
+            </div>
+            <div class="card" style="padding:0;overflow:hidden;margin-top:12px">
+                <div style="padding:10px 14px;font-weight:700;font-size:13px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1">Đối chiếu chuyển khoản <span style="font-size:11px;font-weight:400;color:var(--text-muted)">轉帳對帳</span></div>
+                <div id="cashflowTransferTable" style="overflow-x:auto"></div>
+            </div>
+        </div>
+
         <!-- ===================== PAGE: LỢI TỨC 利潤分配 ===================== -->
         <div class="page" id="page-loituc">
             <div class="page-header"><h2>Lợi Tức <span class="zh">利潤分配</span></h2></div>
@@ -1633,7 +1651,7 @@ console.log('Imported '+newExps.length+' expenses + '+newRevs.length+' revenues 
 // ========== NAV ==========
 const NAV={
     staff:[{id:'moca',label:'Mở Ca 開班',icon:'💵'},{id:'chitieu',label:'Chi Tiêu 支出',icon:'📝'},{id:'doanhthu',label:'Doanh Thu 營業額',icon:'💰'}],
-    boss:[{id:'moca',label:'Mở Ca 開班',icon:'💵'},{id:'chitieu',label:'Chi Tiêu 支出',icon:'📝'},{id:'doanhthu',label:'Doanh Thu 營業額',icon:'💰'},{id:'thongke-chitieu',label:'TK Chi Tiêu 支出統計',icon:'📊'},{id:'thongke-doanhthu',label:'TK Doanh Thu 營業統計',icon:'📈'},{id:'doichieunh',label:'Đối Chiếu NH 銀行對賬',icon:'🏧'},{id:'tknganhang',label:'TK Ngân Hàng 銀行帳戶',icon:'🏛️'},{id:'loinhuan',label:'Lợi Nhuận 利潤',icon:'🏦'},{id:'loituc',label:'Lợi Tức 利潤分配',icon:'💎'},{id:'history',label:'Lịch Sử 紀錄',icon:'📋'},{id:'accounts',label:'Tài Khoản 帳戶',icon:'👥'}]
+    boss:[{id:'moca',label:'Mở Ca 開班',icon:'💵'},{id:'chitieu',label:'Chi Tiêu 支出',icon:'📝'},{id:'doanhthu',label:'Doanh Thu 營業額',icon:'💰'},{id:'thongke-chitieu',label:'TK Chi Tiêu 支出統計',icon:'📊'},{id:'thongke-doanhthu',label:'TK Doanh Thu 營業統計',icon:'📈'},{id:'doichieunh',label:'Đối Chiếu NH 銀行對賬',icon:'🏧'},{id:'tknganhang',label:'TK Ngân Hàng 銀行帳戶',icon:'🏛️'},{id:'loinhuan',label:'Lợi Nhuận 利潤',icon:'🏦'},{id:'dongtien',label:'Dòng Tiền 現金流',icon:'💸'},{id:'loituc',label:'Lợi Tức 利潤分配',icon:'💎'},{id:'history',label:'Lịch Sử 紀錄',icon:'📋'},{id:'accounts',label:'Tài Khoản 帳戶',icon:'👥'}]
 };
 function showApp(){
     document.getElementById('loginScreen').style.display='none';
@@ -1672,6 +1690,7 @@ function navigateTo(p){
     if(p==='doichieunh')initBankReconcile();
     if(p==='tknganhang')renderBankAccount();
     if(p==='loinhuan')renderProfitStats();
+    if(p==='dongtien')renderCashFlow();
     if(p==='loituc')initLoitucPage();
     if(p==='accounts')renderAccounts();
     if(p==='history')renderHistory();
@@ -3819,12 +3838,17 @@ function getMonthlyData(year){
         const exps=allExp.filter(e=>{const d=new Date(e.date);return d.getMonth()+1===m&&d.getFullYear()===year});
         const revs=allRev.filter(r=>{const d=new Date(r.date);return d.getMonth()+1===m&&d.getFullYear()===year});
         const tExp=exps.reduce((s,e)=>s+(e.amount||0),0);
-        const tRev=revs.reduce((s,r)=>s+(r.totalActual||0),0);
+        const tExpCash=exps.filter(e=>e.payMethod==='cash').reduce((s,e)=>s+(e.amount||0),0);
+        const tExpTr=exps.filter(e=>e.payMethod==='transfer').reduce((s,e)=>s+(e.amount||0),0);
+        const tTip=revs.reduce((s,r)=>s+(r.tip||0),0);
+        const tStaff=revs.reduce((s,r)=>s+(r.staffAmount||0),0);
+        const tRevRaw=revs.reduce((s,r)=>s+(r.totalActual||0),0);
+        const tRev=tRevRaw-tTip;
         const tCash=revs.reduce((s,r)=>s+(r.cash1||0)+(r.cash2||0),0);
         const tTr=revs.reduce((s,r)=>s+(r.transfer||0),0);
         const tGrab=revs.reduce((s,r)=>s+(r.grabNet!==undefined?r.grabNet:(r.grab||0)),0);
         const tOther=revs.reduce((s,r)=>s+(r.other||0),0);
-        months.push({m,exps,revs,tExp,tRev,tCash,tTr,tGrab,tOther,profit:tRev-tExp});
+        months.push({m,exps,revs,tExp,tExpCash,tExpTr,tRev,tCash,tTr,tGrab,tOther,tTip,tStaff,profit:tRev-tExp});
     }
     return months;
 }
@@ -4143,7 +4167,7 @@ function renderRevenueStats(){
         // ===== ALL YEARS 全年度對比 =====
         const allRevs=gs(SK.revenues)||[];
         const years=[...new Set(allRevs.map(r=>new Date(r.date).getFullYear()))].sort();
-        const yearData=years.map(y=>{const revs=allRevs.filter(r=>new Date(r.date).getFullYear()===y);const t=revs.reduce((s,r)=>s+(r.totalActual||0),0);const cash=revs.reduce((s,r)=>s+(r.cash1||0)+(r.cash2||0),0);const tr=revs.reduce((s,r)=>s+(r.transfer||0),0);const grab=revs.reduce((s,r)=>s+(r.grabNet!==undefined?r.grabNet:(r.grab||0)),0);return{y,t,cash,tr,grab,days:revs.length}});
+        const yearData=years.map(y=>{const revs=allRevs.filter(r=>new Date(r.date).getFullYear()===y);const tip=revs.reduce((s,r)=>s+(r.tip||0),0);const t=revs.reduce((s,r)=>s+(r.totalActual||0),0)-tip;const cash=revs.reduce((s,r)=>s+(r.cash1||0)+(r.cash2||0),0);const tr=revs.reduce((s,r)=>s+(r.transfer||0),0);const grab=revs.reduce((s,r)=>s+(r.grabNet!==undefined?r.grabNet:(r.grab||0)),0);return{y,t,cash,tr,grab,tip,days:revs.length}});
         const gt=yearData.reduce((s,d)=>s+d.t,0);
         document.getElementById('revenueStatsGrid').innerHTML=`<div style="display:grid;grid-template-columns:repeat(${Math.min(yearData.length+1,5)},1fr);gap:8px">${yearData.map(d=>`<div style="text-align:center;padding:10px;background:#fff;border-radius:8px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--text-muted)">${d.y}</div><div style="font-weight:800;color:var(--success);font-size:13px">${fmt(d.t)}</div><div style="font-size:8px;color:var(--text-muted)">${d.days} ngày 天</div></div>`).join('')}<div style="text-align:center;padding:10px;background:rgba(34,197,94,0.06);border-radius:8px;border:2px solid var(--success)"><div style="font-size:9px;color:var(--text-muted)">Tổng 總計</div><div style="font-weight:800;color:var(--success);font-size:13px">${fmt(gt)}</div></div></div>`;
         // Alert: year-over-year
@@ -4153,9 +4177,9 @@ function renderRevenueStats(){
         const canvas=document.getElementById('revChartCanvas');
         drawBarChart(canvas,years.map(String),[{label:'Doanh thu 營業額',data:yearData.map(d=>d.t),color:'#22c55e'}],'So sánh doanh thu các năm 各年度營業額對比');
         document.getElementById('revCompareTitle').innerHTML=`So sánh doanh thu các năm <span style="font-size:11px;font-weight:400;color:var(--text-muted)">各年度營業額對比</span>`;
-        let tbl=`<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 6px;text-align:left">Năm 年份</th><th style="padding:5px;text-align:right">Doanh thu 營業額</th><th style="padding:5px;text-align:right">T.Mặt 現金</th><th style="padding:5px;text-align:right">CK 轉帳</th><th style="padding:5px;text-align:right">Grab</th><th style="padding:5px;text-align:right">Ngày 天數</th><th style="padding:5px;text-align:right">TB/ngày 日均</th><th style="padding:5px;text-align:right">Tăng trưởng 增長</th></tr></thead><tbody>`;
-        let prev=0;yearData.forEach(d=>{const avg=d.days>0?Math.round(d.t/d.days):0;const g=prev>0?((d.t-prev)/prev*100).toFixed(1):'—';const gs2=prev>0?(parseFloat(g)>=0?'+':'')+g+'%':'—';tbl+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 6px;font-weight:700">${d.y}</td><td style="padding:5px;text-align:right;font-weight:700;color:var(--success)">${fmtNum(d.t)}</td><td style="padding:5px;text-align:right">${fmtNum(d.cash)}</td><td style="padding:5px;text-align:right">${fmtNum(d.tr)}</td><td style="padding:5px;text-align:right">${fmtNum(d.grab)}</td><td style="padding:5px;text-align:right">${d.days}</td><td style="padding:5px;text-align:right">${fmtNum(avg)}</td><td style="padding:5px;text-align:right;color:${parseFloat(g)>=0?'var(--success)':'var(--danger)'}">${gs2}</td></tr>`;prev=d.t});
-        tbl+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--success)"><td style="padding:5px 6px">TỔNG 合計</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(gt)}</td><td style="padding:5px;text-align:right">${fmtNum(yearData.reduce((s,d)=>s+d.cash,0))}</td><td style="padding:5px;text-align:right">${fmtNum(yearData.reduce((s,d)=>s+d.tr,0))}</td><td style="padding:5px;text-align:right">${fmtNum(yearData.reduce((s,d)=>s+d.grab,0))}</td><td style="padding:5px;text-align:right">${yearData.reduce((s,d)=>s+d.days,0)}</td><td></td><td></td></tr></tbody></table>`;
+        let tbl=`<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 6px;text-align:left">Năm 年份</th><th style="padding:5px;text-align:right">Doanh thu 營業額</th><th style="padding:5px;text-align:right">T.Mặt 現金</th><th style="padding:5px;text-align:right">CK 轉帳</th><th style="padding:5px;text-align:right">Grab</th><th style="padding:5px;text-align:right">Tip 小費</th><th style="padding:5px;text-align:right">Ngày 天數</th><th style="padding:5px;text-align:right">TB/ngày 日均</th><th style="padding:5px;text-align:right">Tăng trưởng 增長</th></tr></thead><tbody>`;
+        let prev=0;yearData.forEach(d=>{const avg=d.days>0?Math.round(d.t/d.days):0;const g=prev>0?((d.t-prev)/prev*100).toFixed(1):'—';const gs2=prev>0?(parseFloat(g)>=0?'+':'')+g+'%':'—';tbl+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 6px;font-weight:700">${d.y}</td><td style="padding:5px;text-align:right;font-weight:700;color:var(--success)">${fmtNum(d.t)}</td><td style="padding:5px;text-align:right">${fmtNum(d.cash)}</td><td style="padding:5px;text-align:right">${fmtNum(d.tr)}</td><td style="padding:5px;text-align:right">${fmtNum(d.grab)}</td><td style="padding:5px;text-align:right;color:var(--text-muted)">${fmtNum(d.tip)}</td><td style="padding:5px;text-align:right">${d.days}</td><td style="padding:5px;text-align:right">${fmtNum(avg)}</td><td style="padding:5px;text-align:right;color:${parseFloat(g)>=0?'var(--success)':'var(--danger)'}">${gs2}</td></tr>`;prev=d.t});
+        tbl+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--success)"><td style="padding:5px 6px">TỔNG 合計</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(gt)}</td><td style="padding:5px;text-align:right">${fmtNum(yearData.reduce((s,d)=>s+d.cash,0))}</td><td style="padding:5px;text-align:right">${fmtNum(yearData.reduce((s,d)=>s+d.tr,0))}</td><td style="padding:5px;text-align:right">${fmtNum(yearData.reduce((s,d)=>s+d.grab,0))}</td><td style="padding:5px;text-align:right;color:var(--text-muted)">${fmtNum(yearData.reduce((s,d)=>s+d.tip,0))}</td><td style="padding:5px;text-align:right">${yearData.reduce((s,d)=>s+d.days,0)}</td><td></td><td></td></tr></tbody></table>`;
         document.getElementById('revMonthCompare').innerHTML=tbl;
         return;
     }
@@ -4196,18 +4220,18 @@ function renderRevenueStats(){
         drawBarChart(canvas,['T.Mặt 現金','CK 轉帳','Grab','Khác 其他'],[{label:'T'+selM,data:[mData.tCash,mData.tTr,mData.tGrab,mData.tOther],color:'#22c55e'}],'Cơ cấu DT T'+selM+'/'+y+' 營收結構');
         // Daily detail table for this month
         document.getElementById('revCompareTitle').innerHTML=`Chi tiết T${selM}/${y} theo ngày <span style="font-size:11px;font-weight:400;color:var(--text-muted)">第${selM}月每日明細</span>`;
-        const byDay={};mData.revs.forEach(r=>{if(!byDay[r.date])byDay[r.date]={cash:0,tr:0,grab:0,oth:0,t:0};byDay[r.date].cash+=(r.cash1||0)+(r.cash2||0);byDay[r.date].tr+=(r.transfer||0);byDay[r.date].grab+=(r.grabNet!==undefined?r.grabNet:(r.grab||0));byDay[r.date].oth+=(r.other||0);byDay[r.date].t+=(r.totalActual||0)});
+        const byDay={};mData.revs.forEach(r=>{if(!byDay[r.date])byDay[r.date]={cash:0,tr:0,grab:0,oth:0,tip:0,t:0};byDay[r.date].cash+=(r.cash1||0)+(r.cash2||0);byDay[r.date].tr+=(r.transfer||0);byDay[r.date].grab+=(r.grabNet!==undefined?r.grabNet:(r.grab||0));byDay[r.date].oth+=(r.other||0);byDay[r.date].tip+=(r.tip||0);byDay[r.date].t+=(r.totalActual||0)-(r.tip||0)});
         const days=Object.entries(byDay).sort((a,b)=>a[0].localeCompare(b[0]));
         const dayAvg=days.length>0?mData.tRev/days.length:0;
-        let tbl=`<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary);position:sticky;top:0;z-index:1"><th style="padding:5px 6px;text-align:left">Ngày 日期</th><th style="padding:5px;text-align:right">T.Mặt 現金</th><th style="padding:5px;text-align:right">CK 轉帳</th><th style="padding:5px;text-align:right">Grab</th><th style="padding:5px;text-align:right">Khác 其他</th><th style="padding:5px;text-align:right;font-weight:700">Tổng 合計</th><th style="padding:5px;text-align:center">Đánh giá 評估</th></tr></thead><tbody>`;
+        let tbl=`<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary);position:sticky;top:0;z-index:1"><th style="padding:5px 6px;text-align:left">Ngày 日期</th><th style="padding:5px;text-align:right">T.Mặt 現金</th><th style="padding:5px;text-align:right">CK 轉帳</th><th style="padding:5px;text-align:right">Grab</th><th style="padding:5px;text-align:right">Khác 其他</th><th style="padding:5px;text-align:right">Tip 小費</th><th style="padding:5px;text-align:right;font-weight:700">Tổng 合計</th><th style="padding:5px;text-align:center">Đánh giá 評估</th></tr></thead><tbody>`;
         days.forEach(([d,v])=>{
             const ratio=dayAvg>0?v.t/dayAvg:1;
             let st='— Ổn 正常',sc='var(--text-muted)',sb='';
             if(ratio>1.3){st='↑ Cao 偏高';sc='var(--success)';sb='rgba(34,197,94,0.04)'}
             else if(ratio<0.6&&v.t>0){st='↓ Thấp 偏低';sc='var(--danger)';sb='rgba(239,68,68,0.04)'}
-            tbl+=`<tr style="border-bottom:1px solid #f0f0f0;${sb?'background:'+sb:''}"><td style="padding:4px 6px">${d.slice(5)}</td><td style="padding:4px;text-align:right">${fmtNum(v.cash)}</td><td style="padding:4px;text-align:right">${fmtNum(v.tr)}</td><td style="padding:4px;text-align:right">${fmtNum(v.grab)}</td><td style="padding:4px;text-align:right">${fmtNum(v.oth)}</td><td style="padding:4px;text-align:right;font-weight:700">${fmtNum(v.t)}</td><td style="padding:4px;text-align:center;font-size:9px;color:${sc}">${st}</td></tr>`;
+            tbl+=`<tr style="border-bottom:1px solid #f0f0f0;${sb?'background:'+sb:''}"><td style="padding:4px 6px">${d.slice(5)}</td><td style="padding:4px;text-align:right">${fmtNum(v.cash)}</td><td style="padding:4px;text-align:right">${fmtNum(v.tr)}</td><td style="padding:4px;text-align:right">${fmtNum(v.grab)}</td><td style="padding:4px;text-align:right">${fmtNum(v.oth)}</td><td style="padding:4px;text-align:right;color:var(--text-muted)">${fmtNum(v.tip)}</td><td style="padding:4px;text-align:right;font-weight:700">${fmtNum(v.t)}</td><td style="padding:4px;text-align:center;font-size:9px;color:${sc}">${st}</td></tr>`;
         });
-        tbl+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--success)"><td style="padding:5px 6px">TỔNG 合計</td><td style="padding:5px;text-align:right">${fmtNum(mData.tCash)}</td><td style="padding:5px;text-align:right">${fmtNum(mData.tTr)}</td><td style="padding:5px;text-align:right">${fmtNum(mData.tGrab)}</td><td style="padding:5px;text-align:right">${fmtNum(mData.tOther)}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(mData.tRev)}</td><td></td></tr></tbody></table>`;
+        tbl+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--success)"><td style="padding:5px 6px">TỔNG 合計</td><td style="padding:5px;text-align:right">${fmtNum(mData.tCash)}</td><td style="padding:5px;text-align:right">${fmtNum(mData.tTr)}</td><td style="padding:5px;text-align:right">${fmtNum(mData.tGrab)}</td><td style="padding:5px;text-align:right">${fmtNum(mData.tOther)}</td><td style="padding:5px;text-align:right;color:var(--text-muted)">${fmtNum(mData.tTip)}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(mData.tRev)}</td><td></td></tr></tbody></table>`;
         document.getElementById('revMonthCompare').innerHTML=tbl;
     } else {
         // ===== FULL YEAR 全年概覽 =====
@@ -4242,7 +4266,7 @@ function renderRevenueStats(){
         drawBarChart(canvas,md.map(m=>'T'+m.m),[{label:'Doanh thu 營業額',data:md.map(m=>m.tRev),color:'#22c55e'}],'Doanh thu '+y+' 年度營業額');
         // Monthly table
         document.getElementById('revCompareTitle').innerHTML=`So sánh doanh thu theo tháng <span style="font-size:11px;font-weight:400;color:var(--text-muted)">每月營業額比較</span>`;
-        let tbl=`<table style="width:100%;font-size:10px;border-collapse:collapse;min-width:700px"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 6px;text-align:left">Tháng 月份</th><th style="padding:5px;text-align:right">T.Mặt 現金</th><th style="padding:5px;text-align:right">CK 轉帳</th><th style="padding:5px;text-align:right">Grab</th><th style="padding:5px;text-align:right">Khác 其他</th><th style="padding:5px;text-align:right;font-weight:700">Tổng DT 合計</th><th style="padding:5px;text-align:right">Ngày 天</th><th style="padding:5px;text-align:right">TB/ngày 日均</th><th style="padding:5px;text-align:right">Tăng trưởng 增長</th></tr></thead><tbody>`;
+        let tbl=`<table style="width:100%;font-size:10px;border-collapse:collapse;min-width:700px"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 6px;text-align:left">Tháng 月份</th><th style="padding:5px;text-align:right">T.Mặt 現金</th><th style="padding:5px;text-align:right">CK 轉帳</th><th style="padding:5px;text-align:right">Grab</th><th style="padding:5px;text-align:right">Khác 其他</th><th style="padding:5px;text-align:right">Tip 小費</th><th style="padding:5px;text-align:right;font-weight:700">Tổng DT 合計</th><th style="padding:5px;text-align:right">Ngày 天</th><th style="padding:5px;text-align:right">TB/ngày 日均</th><th style="padding:5px;text-align:right">Tăng trưởng 增長</th></tr></thead><tbody>`;
         let prevRev=0;
         md.forEach(m=>{
             if(m.tRev===0&&m.revs.length===0){prevRev=0;return}
@@ -4251,11 +4275,11 @@ function renderRevenueStats(){
             const avg=m.revs.length>0?Math.round(m.tRev/m.revs.length):0;
             const isLow=avgMonth>0&&m.tRev<avgMonth*0.7;
             const isHigh=avgMonth>0&&m.tRev>avgMonth*1.3;
-            tbl+=`<tr style="border-bottom:1px solid #f0f0f0;${isLow?'background:rgba(239,68,68,0.04)':isHigh?'background:rgba(34,197,94,0.04)':''}"><td style="padding:5px 6px;font-weight:600">T${m.m}</td><td style="padding:5px;text-align:right">${fmtNum(m.tCash)}</td><td style="padding:5px;text-align:right">${fmtNum(m.tTr)}</td><td style="padding:5px;text-align:right">${fmtNum(m.tGrab)}</td><td style="padding:5px;text-align:right">${fmtNum(m.tOther)}</td><td style="padding:5px;text-align:right;font-weight:700">${fmtNum(m.tRev)}</td><td style="padding:5px;text-align:right">${m.revs.length}</td><td style="padding:5px;text-align:right">${fmtNum(avg)}</td><td style="padding:5px;text-align:right;font-weight:600;color:${growth>=0?'var(--success)':'var(--danger)'}">${growthStr}</td></tr>`;
+            tbl+=`<tr style="border-bottom:1px solid #f0f0f0;${isLow?'background:rgba(239,68,68,0.04)':isHigh?'background:rgba(34,197,94,0.04)':''}"><td style="padding:5px 6px;font-weight:600">T${m.m}</td><td style="padding:5px;text-align:right">${fmtNum(m.tCash)}</td><td style="padding:5px;text-align:right">${fmtNum(m.tTr)}</td><td style="padding:5px;text-align:right">${fmtNum(m.tGrab)}</td><td style="padding:5px;text-align:right">${fmtNum(m.tOther)}</td><td style="padding:5px;text-align:right;color:var(--text-muted)">${fmtNum(m.tTip)}</td><td style="padding:5px;text-align:right;font-weight:700">${fmtNum(m.tRev)}</td><td style="padding:5px;text-align:right">${m.revs.length}</td><td style="padding:5px;text-align:right">${fmtNum(avg)}</td><td style="padding:5px;text-align:right;font-weight:600;color:${growth>=0?'var(--success)':'var(--danger)'}">${growthStr}</td></tr>`;
             prevRev=m.tRev;
         });
-        const tCash2=md.reduce((s,m)=>s+m.tCash,0),tTr=md.reduce((s,m)=>s+m.tTr,0),tGrab=md.reduce((s,m)=>s+m.tGrab,0),tOther=md.reduce((s,m)=>s+m.tOther,0);
-        tbl+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--success)"><td style="padding:5px 6px">TỔNG 合計</td><td style="padding:5px;text-align:right">${fmtNum(tCash2)}</td><td style="padding:5px;text-align:right">${fmtNum(tTr)}</td><td style="padding:5px;text-align:right">${fmtNum(tGrab)}</td><td style="padding:5px;text-align:right">${fmtNum(tOther)}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(totalYear)}</td><td style="padding:5px;text-align:right">${totalDays}</td><td style="padding:5px;text-align:right">${fmtNum(Math.round(avgDay))}</td><td></td></tr></tbody></table>`;
+        const tCash2=md.reduce((s,m)=>s+m.tCash,0),tTr=md.reduce((s,m)=>s+m.tTr,0),tGrab=md.reduce((s,m)=>s+m.tGrab,0),tOther=md.reduce((s,m)=>s+m.tOther,0),tTipY=md.reduce((s,m)=>s+m.tTip,0);
+        tbl+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--success)"><td style="padding:5px 6px">TỔNG 合計</td><td style="padding:5px;text-align:right">${fmtNum(tCash2)}</td><td style="padding:5px;text-align:right">${fmtNum(tTr)}</td><td style="padding:5px;text-align:right">${fmtNum(tGrab)}</td><td style="padding:5px;text-align:right">${fmtNum(tOther)}</td><td style="padding:5px;text-align:right;color:var(--text-muted)">${fmtNum(tTipY)}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(totalYear)}</td><td style="padding:5px;text-align:right">${totalDays}</td><td style="padding:5px;text-align:right">${fmtNum(Math.round(avgDay))}</td><td></td></tr></tbody></table>`;
         document.getElementById('revMonthCompare').innerHTML=tbl;
     }
 }
@@ -4271,7 +4295,7 @@ function renderProfitStats(){
         // ===== ALL YEARS 全年度利潤對比 =====
         const allExps=gs(SK.expenses)||[],allRevs=gs(SK.revenues)||[];
         const years=[...new Set([...allExps.map(e=>new Date(e.date).getFullYear()),...allRevs.map(r=>new Date(r.date).getFullYear())])].sort();
-        const yearData=years.map(y=>{const rev=allRevs.filter(r=>new Date(r.date).getFullYear()===y).reduce((s,r)=>s+(r.totalActual||0),0);const exp=allExps.filter(e=>new Date(e.date).getFullYear()===y).reduce((s,e)=>s+e.amount,0);return{y,rev,exp,profit:rev-exp}});
+        const yearData=years.map(y=>{const yRevs=allRevs.filter(r=>new Date(r.date).getFullYear()===y);const tip=yRevs.reduce((s,r)=>s+(r.tip||0),0);const rev=yRevs.reduce((s,r)=>s+(r.totalActual||0),0)-tip;const exp=allExps.filter(e=>new Date(e.date).getFullYear()===y).reduce((s,e)=>s+e.amount,0);return{y,rev,exp,profit:rev-exp}});
         const tRev=yearData.reduce((s,d)=>s+d.rev,0),tExp=yearData.reduce((s,d)=>s+d.exp,0),tProfit=tRev-tExp;
         document.getElementById('profitStatsCards').innerHTML=`<div style="display:grid;grid-template-columns:repeat(${Math.min(yearData.length+1,5)},1fr);gap:8px">${yearData.map(d=>`<div style="text-align:center;padding:10px;background:${d.profit>=0?'rgba(34,197,94,0.06)':'rgba(239,68,68,0.06)'};border-radius:8px;border:1.5px solid ${d.profit>=0?'var(--success)':'var(--danger)'}"><div style="font-size:9px;color:var(--text-muted)">LN ${d.y} 利潤</div><div style="font-weight:800;color:${d.profit>=0?'var(--success)':'var(--danger)'};font-size:13px">${fmt(d.profit)}</div><div style="font-size:8px;color:var(--text-muted)">${d.rev>0?(d.profit/d.rev*100).toFixed(1):'0'}%</div></div>`).join('')}<div style="text-align:center;padding:10px;background:${tProfit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};border-radius:8px;border:2px solid ${tProfit>=0?'var(--success)':'var(--danger)'}"><div style="font-size:9px;color:var(--text-muted)">Tổng 總計</div><div style="font-weight:800;color:${tProfit>=0?'var(--success)':'var(--danger)'};font-size:13px">${fmt(tProfit)}</div></div></div>`;
         // Alert
@@ -4346,10 +4370,11 @@ function renderProfitStats(){
         // Comparison table: this month vs prev + avg
         document.getElementById('profitCompareTitle').innerHTML=`Chi tiết lợi nhuận T${selM}/${y} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">第${selM}月利潤明細</span>`;
         let tbl=`<table style="width:100%;font-size:11px;border-collapse:collapse">
-            <tr style="border-bottom:1px solid #eee"><td style="padding:6px;font-weight:600">Doanh thu 營業額</td><td style="text-align:right;padding:6px;color:var(--success);font-weight:700">${fmt(mData.tRev)}</td><td style="text-align:right;padding:6px;color:var(--text-muted);font-size:10px">${prevM?'T'+(selM-1)+': '+fmtNum(prevM.tRev):'—'}</td></tr>
+            <tr style="border-bottom:1px solid #eee"><td style="padding:6px;font-weight:600">Doanh thu 營業額 <span style="font-size:9px;color:var(--text-muted)">(trừ tip)</span></td><td style="text-align:right;padding:6px;color:var(--success);font-weight:700">${fmt(mData.tRev)}</td><td style="text-align:right;padding:6px;color:var(--text-muted);font-size:10px">${prevM?'T'+(selM-1)+': '+fmtNum(prevM.tRev):'—'}</td></tr>
             <tr style="border-bottom:1px solid #eee"><td style="padding:6px;font-weight:600">(−) Chi tiêu 支出</td><td style="text-align:right;padding:6px;color:var(--danger);font-weight:700">${fmt(mData.tExp)}</td><td style="text-align:right;padding:6px;color:var(--text-muted);font-size:10px">${prevM?'T'+(selM-1)+': '+fmtNum(prevM.tExp):'—'}</td></tr>
             <tr style="background:${mData.profit>=0?'rgba(34,197,94,0.06)':'rgba(239,68,68,0.06)'};font-weight:800;border-top:2px solid ${mData.profit>=0?'var(--success)':'var(--danger)'}"><td style="padding:8px 6px">= Lợi nhuận 利潤</td><td style="text-align:right;padding:8px 6px;color:${mData.profit>=0?'var(--success)':'var(--danger)'}">${fmt(mData.profit)}</td><td style="text-align:right;padding:8px 6px;font-size:10px;color:var(--text-muted)">${prevM?'T'+(selM-1)+': '+fmtNum(prevM.profit):'—'} <span style="color:${growth>=0?'var(--success)':'var(--danger)'}">${growthStr}</span></td></tr>
             <tr><td style="padding:6px">Biên LN 利潤率</td><td style="text-align:right;padding:6px;font-weight:700">${margin}%</td><td style="text-align:right;padding:6px;color:var(--text-muted);font-size:10px">TB năm 年均: ${avgMargin}%</td></tr>
+            ${mData.tTip>0?`<tr style="border-top:1px solid #eee"><td style="padding:6px;color:#f59e0b">🎁 Tip 小費 (không tính)</td><td style="text-align:right;padding:6px;color:#f59e0b;font-weight:600">${fmt(mData.tTip)}</td><td></td></tr>`:''}
         </table>`;
         document.getElementById('profitMonthTable').innerHTML=tbl;
         // (Lợi tức now on separate page)
@@ -4803,13 +4828,74 @@ function getCumulativeProfit(year,month,cutoffDay){
             const isLastMonth=(yr===year&&m===month&&cutoffDay);
             const revs=allRev.filter(r=>{const d=new Date(r.date);return d.getMonth()+1===m&&d.getFullYear()===yr&&(!isLastMonth||d.getDate()<=cutoffDay)});
             const exps=allExp.filter(e=>{const d=new Date(e.date);return d.getMonth()+1===m&&d.getFullYear()===yr&&(!isLastMonth||d.getDate()<=cutoffDay)});
-            yRev+=revs.reduce((s,r)=>s+(r.totalActual||0),0);
+            yRev+=revs.reduce((s,r)=>s+(r.totalActual||0)-(r.tip||0),0);
             yExp+=exps.reduce((s,e)=>s+(e.amount||0),0);
         }
         totalRev+=yRev;totalExp+=yExp;
         byYear.push({y:yr,rev:yRev,exp:yExp,profit:yRev-yExp,margin:yRev>0?((yRev-yExp)/yRev*100).toFixed(1):'0'});
     }
     return {totalRev,totalExp,profit:totalRev-totalExp,margin:totalRev>0?((totalRev-totalExp)/totalRev*100).toFixed(1):'0',byYear};
+}
+// ========== CASH FLOW 現金流 ==========
+function renderCashFlow(){
+    mergeGrabUpdates();
+    const y=Number(document.getElementById('cashflow-year').value);
+    const md=getMonthlyData(y);
+    const allExp=gs(SK.expenses)||[];
+
+    // === TIP REPORT 小費報告 ===
+    const totalTip=md.reduce((s,m)=>s+m.tTip,0);
+    let tipHtml=`<div class="card" style="padding:14px;border-left:4px solid #f59e0b">
+        <div style="font-weight:700;font-size:13px;margin-bottom:8px">🎁 Báo cáo Tip ${y} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">小費報告 (không tính vào DT & LN)</span></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:6px;margin-bottom:8px">`;
+    md.forEach(m=>{
+        if(m.tTip>0) tipHtml+=`<div style="text-align:center;padding:6px;background:rgba(245,158,11,0.06);border-radius:6px;border:1px solid rgba(245,158,11,0.2)"><div style="font-size:9px;color:var(--text-muted)">T${m.m}</div><div style="font-weight:700;font-size:11px;color:#f59e0b">${fmtNum(m.tTip)}</div></div>`;
+    });
+    tipHtml+=`</div>
+        <div style="text-align:center;padding:8px;background:rgba(245,158,11,0.08);border-radius:8px;border:1.5px solid #f59e0b">
+            <div style="font-size:9px;color:var(--text-muted)">Tổng Tip ${y} 小費合計</div>
+            <div style="font-weight:800;font-size:15px;color:#f59e0b">${fmt(totalTip)}</div>
+        </div>
+    </div>`;
+    document.getElementById('cashflowTipReport').innerHTML=tipHtml;
+
+    // === SUMMARY CARDS ===
+    const totalCashIn=md.reduce((s,m)=>s+m.tCash,0);
+    const totalCashOut=md.reduce((s,m)=>s+m.tExpCash,0);
+    const cashBalance=totalCashIn-totalCashOut;
+    const totalTrIn=md.reduce((s,m)=>s+m.tTr+m.tGrab,0);
+    const totalTrOut=md.reduce((s,m)=>s+m.tExpTr,0);
+    const trBalance=totalTrIn-totalTrOut;
+    document.getElementById('cashflowCards').innerHTML=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="text-align:center;padding:10px;background:rgba(34,197,94,0.06);border-radius:8px;border:1.5px solid var(--success)"><div style="font-size:9px;color:var(--text-muted)">T.Mặt ròng 現金淨額</div><div style="font-weight:800;font-size:14px;color:${cashBalance>=0?'var(--success)':'var(--danger)'}">${fmt(cashBalance)}</div></div>
+        <div style="text-align:center;padding:10px;background:rgba(99,102,241,0.06);border-radius:8px;border:1.5px solid var(--primary)"><div style="font-size:9px;color:var(--text-muted)">CK ròng 轉帳淨額</div><div style="font-weight:800;font-size:14px;color:${trBalance>=0?'var(--success)':'var(--danger)'}">${fmt(trBalance)}</div></div>
+        <div style="text-align:center;padding:10px;background:rgba(245,158,11,0.06);border-radius:8px;border:1.5px solid #f59e0b"><div style="font-size:9px;color:var(--text-muted)">Tổng Tip 小費</div><div style="font-weight:800;font-size:14px;color:#f59e0b">${fmt(totalTip)}</div></div>
+    </div>`;
+
+    // === CASH TABLE 現金對帳 ===
+    let cashTbl=`<table style="width:100%;font-size:10px;border-collapse:collapse;min-width:500px"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 6px;text-align:left">Tháng 月份</th><th style="padding:5px;text-align:right;color:var(--success)">Thu TM 現金收</th><th style="padding:5px;text-align:right;color:var(--danger)">Chi TM 現金支</th><th style="padding:5px;text-align:right;font-weight:700">Chênh lệch 差額</th><th style="padding:5px;text-align:right">Lũy kế 累計</th></tr></thead><tbody>`;
+    let cashCumul=0;
+    md.forEach(m=>{
+        if(m.tCash===0&&m.tExpCash===0&&m.revs.length===0) return;
+        const diff=m.tCash-m.tExpCash;
+        cashCumul+=diff;
+        cashTbl+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 6px;font-weight:600">T${m.m}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(m.tCash)}</td><td style="padding:5px;text-align:right;color:var(--danger)">${fmtNum(m.tExpCash)}</td><td style="padding:5px;text-align:right;font-weight:700;color:${diff>=0?'var(--success)':'var(--danger)'}">${fmtNum(diff)}</td><td style="padding:5px;text-align:right;font-weight:600;color:${cashCumul>=0?'var(--success)':'var(--danger)'}">${fmtNum(cashCumul)}</td></tr>`;
+    });
+    cashTbl+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--success)"><td style="padding:5px 6px">TỔNG 合計</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(totalCashIn)}</td><td style="padding:5px;text-align:right;color:var(--danger)">${fmtNum(totalCashOut)}</td><td style="padding:5px;text-align:right;color:${cashBalance>=0?'var(--success)':'var(--danger)'}">${fmtNum(cashBalance)}</td><td style="padding:5px;text-align:right;color:${cashCumul>=0?'var(--success)':'var(--danger)'}">${fmtNum(cashCumul)}</td></tr></tbody></table>`;
+    document.getElementById('cashflowCashTable').innerHTML=cashTbl;
+
+    // === TRANSFER TABLE 轉帳對帳 ===
+    let trTbl=`<table style="width:100%;font-size:10px;border-collapse:collapse;min-width:600px"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 6px;text-align:left">Tháng 月份</th><th style="padding:5px;text-align:right;color:var(--success)">CK DT 轉帳收</th><th style="padding:5px;text-align:right;color:var(--success)">Grab</th><th style="padding:5px;text-align:right;color:var(--success)">Tổng vào 總收</th><th style="padding:5px;text-align:right;color:var(--danger)">CK Chi 轉帳支</th><th style="padding:5px;text-align:right;font-weight:700">Chênh lệch 差額</th><th style="padding:5px;text-align:right">Lũy kế 累計</th></tr></thead><tbody>`;
+    let trCumul=0;
+    md.forEach(m=>{
+        if(m.tTr===0&&m.tGrab===0&&m.tExpTr===0&&m.revs.length===0) return;
+        const trIn=m.tTr+m.tGrab;
+        const diff=trIn-m.tExpTr;
+        trCumul+=diff;
+        trTbl+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 6px;font-weight:600">T${m.m}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(m.tTr)}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(m.tGrab)}</td><td style="padding:5px;text-align:right;color:var(--success);font-weight:600">${fmtNum(trIn)}</td><td style="padding:5px;text-align:right;color:var(--danger)">${fmtNum(m.tExpTr)}</td><td style="padding:5px;text-align:right;font-weight:700;color:${diff>=0?'var(--success)':'var(--danger)'}">${fmtNum(diff)}</td><td style="padding:5px;text-align:right;font-weight:600;color:${trCumul>=0?'var(--success)':'var(--danger)'}">${fmtNum(trCumul)}</td></tr>`;
+    });
+    trTbl+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--primary)"><td style="padding:5px 6px">TỔNG 合計</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(md.reduce((s,m)=>s+m.tTr,0))}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(md.reduce((s,m)=>s+m.tGrab,0))}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(totalTrIn)}</td><td style="padding:5px;text-align:right;color:var(--danger)">${fmtNum(totalTrOut)}</td><td style="padding:5px;text-align:right;color:${trBalance>=0?'var(--success)':'var(--danger)'}">${fmtNum(trBalance)}</td><td style="padding:5px;text-align:right;color:${trCumul>=0?'var(--success)':'var(--danger)'}">${fmtNum(trCumul)}</td></tr></tbody></table>`;
+    document.getElementById('cashflowTransferTable').innerHTML=trTbl;
 }
 function isDividendSkipped(year,month){
     const skips=gs(SK.dividendSkip)||[];
@@ -7069,12 +7155,15 @@ function saveBankExpForm(uid,txnId,bankAmt){
     ss(SK.expenses,expenses);
     syncToSheet('expense',expenses.slice(-1));
     showToast('Đã lưu chi tiêu '+fmtNum(bankAmt)+' 已保存支出','success');
+    // Update reconcile marks for this date
     updateExpCkMark(date);
+    // Find and remove the form
     var safeId=txnId.replace(/[^a-zA-Z0-9]/g,'_');
     cancelBankExpForm('bankExpForm-'+safeId);
     renderBankAccount();
 }
 function updateExpCkMark(date){
+    // Recalculate expck mark for a specific date after adding expense
     var marks=gs('qg_reconcile_marks')||{};
     var txns=getBankTxns();
     var exps=gs(SK.expenses)||[];
@@ -7090,6 +7179,7 @@ function updateExpCkMark(date){
         ss('qg_reconcile_marks',marks);
     }
 }
+
 function subtractDay(dateStr){
     var d=new Date(dateStr+'T12:00:00');
     d.setDate(d.getDate()-1);
@@ -7102,9 +7192,11 @@ function subtractDay(dateStr){
 // ========== INIT ==========
 initData();
 wrapDateInputs();
+// Show cached data immediately, fetch in background (stale-while-revalidate)
 checkSession();
 if(getSheetUrl()){
     loadFromSheet(function(ok){
+        // Re-render current page with fresh data (skip if user is editing a form)
         if(ok&&currentUser){
             if(isUserEditing()){_pendingRerender=true;return}
             const activeEl=document.querySelector('.nav-item.active');
