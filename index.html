@@ -6002,7 +6002,7 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
     html+='</tbody></table></div>';
     // ====== GRAB RECONCILIATION ======
     // Grab: bank date = revenue date + 1 (Grab pays next day)
-    html+='<h4 style="font-size:13px;color:#16a34a;margin:16px 0 8px">🛵 Grab NH vs Grab doanh thu Grab銀行對比 (lệch 1 ngày 延遲1天)</h4>';
+    html+='<div style="display:flex;align-items:center;gap:10px;margin:16px 0 8px"><h4 style="font-size:13px;color:#16a34a;margin:0">🛵 Grab NH vs Grab doanh thu Grab銀行對比 (lệch 1 ngày 延遲1天)</h4><button id="btnApplyAllGrab" onclick="applyAllGrabFees()" style="padding:4px 12px;border-radius:8px;border:1.5px solid #16a34a;background:rgba(22,163,106,0.1);color:#16a34a;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap" title="Áp dụng tất cả chênh lệch Grab 一鍵套用所有Grab差額">📥 Áp dụng tất cả</button></div>';
     html+='<div class="table-wrap"><table><thead><tr><th>NH ngày 銀行日</th><th>DT ngày 營收日</th><th style="text-align:right">NH (Grab) 銀行</th><th style="text-align:right">App (GrabNet) 系統</th><th style="text-align:right">Chênh lệch 差額</th><th>Trạng thái 狀態</th></tr></thead><tbody>';
     var grabByBankDate={};
     grabTxns.forEach(function(t){
@@ -6195,6 +6195,36 @@ function applyBankAmount(type,date,bankAmount){
         var btn=document.getElementById('btnReconcile');
         if(btn)btn.click();
     },500);
+}
+function applyAllGrabFees(){
+    // Collect all Grab mismatches from the reconciliation data
+    var revs=gs(SK.revenues)||[];
+    var allBankTxns=getBankTxns();
+    var grabTxns=allBankTxns.filter(function(t){return t.category==='grab'&&t.isIncome});
+    if(grabTxns.length===0){showToast('Không có dữ liệu Grab NH','warning');return}
+    var grabByBankDate={};
+    grabTxns.forEach(function(t){
+        if(!grabByBankDate[t.date])grabByBankDate[t.date]={total:0};
+        grabByBankDate[t.date].total+=t.amount;
+    });
+    var toApply=[];
+    Object.keys(grabByBankDate).forEach(function(bankDate){
+        var revDate=subtractDay(bankDate);
+        var bankAmt=grabByBankDate[bankDate].total;
+        var dayRevs=revs.filter(function(r){return r.date===revDate});
+        if(dayRevs.length===0)return;
+        var appGrab=dayRevs.reduce(function(s,r){return s+(Number(r.grabNet!==undefined?r.grabNet:(r.grab||0))||0)},0);
+        var diff=bankAmt-appGrab;
+        if(Math.abs(diff)>1000) toApply.push({revDate:revDate,bankAmt:bankAmt,diff:diff});
+    });
+    if(toApply.length===0){showToast('Tất cả Grab đã khớp! 所有Grab已對帳','success');return}
+    if(!confirm('Áp dụng '+toApply.length+' chênh lệch Grab?\n套用'+toApply.length+'筆Grab差額？\n\n'+toApply.map(function(a){return formatDateVN(a.revDate)+': '+fmtNum(a.diff)}).join('\n')))return;
+    var count=0;
+    toApply.forEach(function(item){
+        applyBankAmount('grab',item.revDate,item.bankAmt);
+        count++;
+    });
+    showToast('Đã áp dụng '+count+' chênh lệch Grab 已套用'+count+'筆Grab差額','success');
 }
 function renderAdjustmentHistory(){
     var list=getReconcileAdjustments();
@@ -6966,28 +6996,56 @@ function guessBankCategory(desc){
 }
 function renderBankOut(expense){
     var exps=gs(SK.expenses)||[];
+    // Build bankTxnId lookup for direct matching
+    var expByTxnId={};
+    exps.forEach(function(e){if(e.bankTxnId)expByTxnId[e.bankTxnId]=e});
     // Group app expenses (CK only) by date
     var appExpByDate={};
+    // Also group ALL expenses by date (fallback for payMethod mismatch)
+    var allExpByDate={};
     exps.forEach(function(e){
+        if(!allExpByDate[e.date])allExpByDate[e.date]=[];
+        allExpByDate[e.date].push(e);
         var pm=e.payMethod||'';
         if(pm!=='transfer'&&pm!=='Chuyển khoản')return;
         if(!appExpByDate[e.date])appExpByDate[e.date]=[];
         appExpByDate[e.date].push(e);
     });
     var totalOut=expense.reduce(function(s,t){return s+t.amount},0);
+    // Track used expense indices to prevent double-matching
+    var usedExpIdx={};
+    var expIdx=function(e){return e.id||e.date+'_'+e.amount+'_'+(e.detailVi||'')};
     // Classify bank expenses: matched (found in app expenses) vs unmatched
     var matched=[],unmatched=[];
     expense.forEach(function(t){
-        var dayExps=appExpByDate[t.date]||[];
         var found=null;
-        for(var i=0;i<dayExps.length;i++){
-            if(Math.abs(dayExps[i].amount-t.amount)<=100){
-                found=dayExps[i];
-                dayExps.splice(i,1);
-                break;
+        // Strategy 1: match by bankTxnId (most reliable)
+        if(t.txnId&&expByTxnId[t.txnId]){
+            var candidate=expByTxnId[t.txnId];
+            if(!usedExpIdx[expIdx(candidate)]){found=candidate}
+        }
+        // Strategy 2: match by date + amount in CK expenses
+        if(!found){
+            var dayExps=appExpByDate[t.date]||[];
+            for(var i=0;i<dayExps.length;i++){
+                if(!usedExpIdx[expIdx(dayExps[i])]&&Math.abs(dayExps[i].amount-t.amount)<=100){
+                    found=dayExps[i];
+                    break;
+                }
+            }
+        }
+        // Strategy 3: match by date + amount in ALL expenses (payMethod mismatch)
+        if(!found){
+            var allDay=allExpByDate[t.date]||[];
+            for(var i=0;i<allDay.length;i++){
+                if(!usedExpIdx[expIdx(allDay[i])]&&Math.abs(allDay[i].amount-t.amount)<=100){
+                    found=allDay[i];
+                    break;
+                }
             }
         }
         if(found){
+            usedExpIdx[expIdx(found)]=true;
             matched.push({bank:t,app:found});
         }else{
             var guess=guessBankCategory(t.desc);
