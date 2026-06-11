@@ -898,7 +898,6 @@
                 <div class="tab active" onclick="switchLoitucTab('codong')">Cổ đông 股東</div>
                 <div class="tab" onclick="switchLoitucTab('phucloi')">Phúc lợi 福利</div>
                 <div class="tab" onclick="switchLoitucTab('loituc')">Lợi tức 分紅</div>
-                <div class="tab" onclick="switchLoitucTab('tongquan')">Tổng quan 總覽</div>
             </div>
 
             <!-- TAB: CỔ ĐÔNG 股東 -->
@@ -920,70 +919,118 @@
                                 <option value="investor">Không làm việc tại quán 不在店工作</option>
                             </select>
                         </div>
-                        <div class="form-group" id="sh-salary-group"><label>Lương hàng tháng 月薪</label><input type="text" id="sh-salary" placeholder="VD: 8000000" oninput="this.value=this.value.replace(/[^\d]/g,'')"></div>
+                        <div class="form-group"><label>Vốn đầu tư 投資金額</label><input type="text" id="sh-investment" placeholder="VD: 150000000" oninput="this.value=this.value.replace(/[^\d]/g,'')"></div>
                     </div>
-                    <div class="form-group" id="sh-bonus-group"><label>Thưởng hàng tháng (nếu có) 月獎金</label><input type="text" id="sh-bonus" placeholder="VD: 2000000" oninput="this.value=this.value.replace(/[^\d]/g,'')"></div>
+                    <div class="form-row">
+                        <div class="form-group" id="sh-salary-group"><label>Lương hàng tháng 月薪</label><input type="text" id="sh-salary" placeholder="VD: 8000000" oninput="this.value=this.value.replace(/[^\d]/g,'')"></div>
+                        <div class="form-group" id="sh-bonus-group"><label>Thưởng hàng tháng (nếu có) 月獎金</label><input type="text" id="sh-bonus" placeholder="VD: 2000000" oninput="this.value=this.value.replace(/[^\d]/g,'')"></div>
+                    </div>
                     <div class="flex gap-2"><button class="btn btn-primary" onclick="saveShareholder()">Lưu 儲存</button><button class="btn btn-outline" onclick="hideAddShareholder()">Hủy 取消</button></div>
                 </div>
             </div>
 
             <!-- TAB: PHÚC LỢI 福利 -->
             <div id="loituc-tab-phucloi" style="display:none">
-                <div class="card">
-                    <div class="card-header"><h3>Danh mục phúc lợi <span style="font-size:12px;font-weight:400;color:var(--text-muted)">福利類別</span></h3><button class="btn btn-primary btn-sm" onclick="showAddBenefitCat()">+ Thêm 新增</button></div>
-                    <div id="addBenefitCatForm" style="display:none;padding:10px 14px;border-bottom:1px solid var(--border)">
-                        <div style="display:flex;gap:8px;align-items:center">
-                            <input type="text" id="bf-cat-name" placeholder="Tên phúc lợi (VD: Phí về Đài, Thuê nhà...)" style="flex:1;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
-                            <button class="btn btn-primary btn-sm" onclick="saveBenefitCat()">Lưu 儲存</button>
-                            <button class="btn btn-outline btn-sm" onclick="hideAddBenefitCat()">Hủy</button>
-                        </div>
-                    </div>
-                    <div id="benefitCatList"></div>
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                    <div class="tab active" id="pl-sub-danhsach" onclick="switchPLSub('danhsach')" style="font-size:12px;padding:6px 14px">📋 Phúc lợi 福利</div>
+                    <div class="tab" id="pl-sub-tongquan" onclick="switchPLSub('tongquan')" style="font-size:12px;padding:6px 14px">📊 Tổng quan 總覽</div>
                 </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Phúc lợi theo tháng <span style="font-size:12px;font-weight:400;color:var(--text-muted)">每月福利</span></h3>
-                        <div style="display:flex;gap:6px;align-items:center">
-                            <select id="bf-apply-year" onchange="renderBenefitApply()" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:11px"><option value="2026" selected>2026</option><option value="2025">2025</option></select>
-                            <select id="bf-apply-month" onchange="renderBenefitApply()" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:11px"><option value="1">T1</option><option value="2">T2</option><option value="3">T3</option><option value="4">T4</option><option value="5" selected>T5</option><option value="6">T6</option><option value="7">T7</option><option value="8">T8</option><option value="9">T9</option><option value="10">T10</option><option value="11">T11</option><option value="12">T12</option></select>
+                <!-- Sub: Danh sách phúc lợi -->
+                <div id="pl-content-danhsach">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Quản lý phúc lợi <span style="font-size:12px;font-weight:400;color:var(--text-muted)">福利管理</span></h3>
+                            <div style="display:flex;gap:6px">
+                                <button class="btn btn-outline btn-sm" onclick="toggleBenefitCatManager()">⚙️ Loại PL 類別</button>
+                                <button class="btn btn-primary btn-sm" onclick="showAddBenefitEntry()">+ Thêm 新增</button>
+                            </div>
                         </div>
+                        <div id="benefitFilterBar" style="padding:8px 14px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border)"></div>
+                        <div id="benefitEntriesList"></div>
                     </div>
-                    <div id="benefitApplyContent"></div>
+                    <div class="card hidden" id="addBenefitEntryForm">
+                        <h3 style="margin-bottom:14px">Thêm phúc lợi <span style="font-size:12px;font-weight:400;color:var(--text-muted)">新增福利</span></h3>
+                        <div class="form-row">
+                            <div class="form-group"><label>Ngày 日期</label><input type="date" id="bfe-date"></div>
+                            <div class="form-group"><label>Loại phúc lợi 福利類別</label><select id="bfe-type"></select></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Số tiền 金額</label><input type="text" id="bfe-amount" placeholder="VD: 5000000" oninput="this.value=this.value.replace(/[^\d]/g,'')"></div>
+                            <div class="form-group"><label>Người nhận 對象</label><select id="bfe-person"></select></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Ngày nhận 領取日</label><input type="date" id="bfe-receiveDate"></div>
+                            <div class="form-group"><label>Trạng thái 狀態</label>
+                                <select id="bfe-status">
+                                    <option value="pending">⏳ Chưa nhận 未領</option>
+                                    <option value="received">✅ Đã nhận 已領</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex gap-2"><button class="btn btn-primary" onclick="saveBenefitEntry()">Lưu 儲存</button><button class="btn btn-outline" onclick="hideAddBenefitEntry()">Hủy 取消</button></div>
+                    </div>
+                    <div class="card hidden" id="benefitCatManagerCard">
+                        <div class="card-header"><h3>Quản lý loại phúc lợi <span style="font-size:12px;font-weight:400;color:var(--text-muted)">福利類別管理</span></h3><button class="btn btn-outline btn-sm" onclick="toggleBenefitCatManager()">✕ Đóng</button></div>
+                        <div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+                            <div style="display:flex;gap:8px;align-items:center">
+                                <input type="text" id="bf-cat-name" placeholder="Tên phúc lợi (VD: Thuê nhà, Về Đài...)" style="flex:1;padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px">
+                                <button class="btn btn-primary btn-sm" onclick="saveBenefitCat()">Lưu 儲存</button>
+                            </div>
+                        </div>
+                        <div id="benefitCatList"></div>
+                    </div>
                 </div>
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Tổng phúc lợi 2025–2026 <span style="font-size:12px;font-weight:400;color:var(--text-muted)">福利總覽</span></h3>
-                    </div>
-                    <div id="benefitStatsContent"></div>
+                <!-- Sub: Tổng quan -->
+                <div id="pl-content-tongquan" style="display:none">
+                    <div id="benefitOverviewContent"></div>
                 </div>
             </div>
 
             <!-- TAB: LỢI TỨC 分紅 -->
             <div id="loituc-tab-loituc" style="display:none">
-                <div class="card">
-                    <div class="card-header"><h3>Tính lợi tức <span style="font-size:12px;font-weight:400;color:var(--text-muted)">計算分紅</span></h3>
-                        <div style="display:flex;gap:6px;align-items:center">
-                            <select id="lt-year" onchange="renderDividend()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="2026" selected>2026</option><option value="2025">2025</option></select>
-                            <select id="lt-month" onchange="renderDividend()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="1">T1</option><option value="2">T2</option><option value="3">T3</option><option value="4">T4</option><option value="5" selected>T5</option><option value="6">T6</option><option value="7">T7</option><option value="8">T8</option><option value="9">T9</option><option value="10">T10</option><option value="11">T11</option><option value="12">T12</option></select>
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                    <div class="tab active" id="lt-sub-thamkhao" onclick="switchLTSub('thamkhao')" style="font-size:12px;padding:6px 14px">👁️ Tham khảo 參考</div>
+                    <div class="tab" id="lt-sub-thucte" onclick="switchLTSub('thucte')" style="font-size:12px;padding:6px 14px">🔒 Thực tế 實際</div>
+                </div>
+                <!-- Sub: Tham khảo -->
+                <div id="lt-content-thamkhao">
+                    <div style="padding:8px 14px;background:rgba(99,102,241,0.06);border-radius:8px;margin-bottom:12px;font-size:11px;color:var(--primary)">ℹ️ Tính tự động theo dữ liệu hiện tại, chỉ mang tính tham khảo. Số liệu thay đổi theo hệ thống.<br><span style="font-size:10px">自動計算，僅供參考。數據隨系統變動。</span></div>
+                    <div class="card">
+                        <div class="card-header"><h3>Tính lợi tức (tham khảo) <span style="font-size:12px;font-weight:400;color:var(--text-muted)">分紅計算（參考）</span></h3>
+                            <div style="display:flex;gap:6px;align-items:center">
+                                <select id="lt-year" onchange="renderDividend()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="2026" selected>2026</option><option value="2025">2025</option></select>
+                                <select id="lt-month" onchange="renderDividend()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="1">T1</option><option value="2">T2</option><option value="3">T3</option><option value="4">T4</option><option value="5" selected>T5</option><option value="6">T6</option><option value="7">T7</option><option value="8">T8</option><option value="9">T9</option><option value="10">T10</option><option value="11">T11</option><option value="12">T12</option></select>
+                            </div>
                         </div>
+                        <div id="dividendSkipToggle"></div>
+                        <div id="dividendSettingsUI"></div>
+                        <div id="dividendCalcContent"></div>
                     </div>
-                    <div id="dividendSkipToggle"></div>
-                    <div id="dividendSettingsUI"></div>
-                    <div id="dividendCalcContent"></div>
+                    <div id="dividendShareCard" class="card">
+                        <div class="card-header"><h3>Bảng chia lợi tức <span style="font-size:12px;font-weight:400;color:var(--text-muted)">分紅明細</span></h3></div>
+                        <div id="dividendShareContent"></div>
+                    </div>
+                    <div id="dividendPaymentCard" class="card">
+                        <div class="card-header"><h3>Trạng thái nhận tiền <span style="font-size:12px;font-weight:400;color:var(--text-muted)">收款狀態</span></h3></div>
+                        <div id="dividendPaymentStatus"></div>
+                    </div>
                 </div>
-                <div id="dividendShareCard" class="card">
-                    <div class="card-header"><h3>Bảng chia lợi tức <span style="font-size:12px;font-weight:400;color:var(--text-muted)">分紅明細</span></h3></div>
-                    <div id="dividendShareContent"></div>
+                <!-- Sub: Thực tế -->
+                <div id="lt-content-thucte" style="display:none">
+                    <div class="card">
+                        <div class="card-header"><h3>Tính lợi tức thực tế <span style="font-size:12px;font-weight:400;color:var(--text-muted)">實際分紅計算</span></h3>
+                            <div style="display:flex;gap:6px;align-items:center">
+                                <select id="lt2-year" onchange="renderDividendActual()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="2026" selected>2026</option><option value="2025">2025</option></select>
+                                <select id="lt2-month" onchange="renderDividendActual()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="1">T1</option><option value="2">T2</option><option value="3">T3</option><option value="4">T4</option><option value="5" selected>T5</option><option value="6">T6</option><option value="7">T7</option><option value="8">T8</option><option value="9">T9</option><option value="10">T10</option><option value="11">T11</option><option value="12">T12</option></select>
+                            </div>
+                        </div>
+                        <div id="dividendActualContent"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header"><h3>Lịch sử chốt <span style="font-size:12px;font-weight:400;color:var(--text-muted)">鎖定歷史</span></h3></div>
+                        <div id="dividendLockHistory"></div>
+                    </div>
                 </div>
-                <div id="dividendPaymentCard" class="card">
-                    <div class="card-header"><h3>Trạng thái nhận tiền <span style="font-size:12px;font-weight:400;color:var(--text-muted)">收款狀態</span></h3></div>
-                    <div id="dividendPaymentStatus"></div>
-                </div>
-            </div>
-
-            <!-- TAB: TỔNG QUAN 總覽 -->
-            <div id="loituc-tab-tongquan" style="display:none">
-                <div id="tongquanContent"></div>
             </div>
         </div>
 
@@ -1344,7 +1391,7 @@ function wrapDateInputs(){
     });
 }
 // ========== STORE ==========
-const SK={users:'qg_users',expenses:'qg_expenses',revenues:'qg_revenues',shifts:'qg_shifts',session:'qg_session',categories:'qg_categories',suppliers:'qg_suppliers',shareholders:'qg_shareholders',benefits:'qg_benefits',benefitEntries:'qg_benefit_entries',dividendSettings:'qg_dividend_settings',dividendPayments:'qg_dividend_payments',otherFees:'qg_other_fees',dividendSkip:'qg_dividend_skip',taxRevManual:'qg_tax_rev_manual'};
+const SK={users:'qg_users',expenses:'qg_expenses',revenues:'qg_revenues',shifts:'qg_shifts',session:'qg_session',categories:'qg_categories',suppliers:'qg_suppliers',shareholders:'qg_shareholders',benefits:'qg_benefits',benefitEntries:'qg_benefit_entries',dividendSettings:'qg_dividend_settings',dividendPayments:'qg_dividend_payments',otherFees:'qg_other_fees',dividendSkip:'qg_dividend_skip',taxRevManual:'qg_tax_rev_manual',dividendLocks:'qg_dividend_locks'};
 const _mem={};
 function gs(k){if(_mem[k]!==undefined)return _mem[k];const d=localStorage.getItem(k);if(d){var p=JSON.parse(d);_mem[k]=p;return p}return null}
 function ss(k,d){_mem[k]=d;try{localStorage.setItem(k,JSON.stringify(d))}catch(e){console.warn('localStorage full, key='+k,e)}}
@@ -4450,21 +4497,36 @@ function renderProfitStats(){
 
 // ========== LỢI TỨC 利潤分配 ==========
 function switchLoitucTab(tab){
-    ['codong','phucloi','loituc','tongquan'].forEach(t=>{
-        document.getElementById('loituc-tab-'+t).style.display=t===tab?'':'none';
+    ['codong','phucloi','loituc'].forEach(t=>{
+        var el=document.getElementById('loituc-tab-'+t);if(el)el.style.display=t===tab?'':'none';
     });
-    document.querySelectorAll('#page-loituc .tabs .tab').forEach((el,i)=>{
-        el.classList.toggle('active',['codong','phucloi','loituc','tongquan'][i]===tab);
+    document.querySelectorAll('#page-loituc > .tabs > .tab').forEach((el,i)=>{
+        el.classList.toggle('active',['codong','phucloi','loituc'][i]===tab);
     });
     if(tab==='codong') renderShareholders();
-    if(tab==='phucloi'){renderBenefitCats();renderBenefitApply();renderBenefitStats()}
+    if(tab==='phucloi'){renderBenefitCats();renderBenefitEntries();renderBenefitOverview()}
     if(tab==='loituc') renderDividend();
-    if(tab==='tongquan') renderTongquan();
 }
-function initLoitucPage(){renderShareholders();renderBenefitCats();renderBenefitApply();renderBenefitStats();renderDividend()}
+function initLoitucPage(){renderShareholders();renderBenefitCats();renderBenefitEntries();renderBenefitOverview();renderDividend()}
+function switchPLSub(sub){
+    document.getElementById('pl-content-danhsach').style.display=sub==='danhsach'?'':'none';
+    document.getElementById('pl-content-tongquan').style.display=sub==='tongquan'?'':'none';
+    document.getElementById('pl-sub-danhsach').classList.toggle('active',sub==='danhsach');
+    document.getElementById('pl-sub-tongquan').classList.toggle('active',sub==='tongquan');
+    if(sub==='tongquan') renderBenefitOverview();
+    if(sub==='danhsach') renderBenefitEntries();
+}
+function switchLTSub(sub){
+    document.getElementById('lt-content-thamkhao').style.display=sub==='thamkhao'?'':'none';
+    document.getElementById('lt-content-thucte').style.display=sub==='thucte'?'':'none';
+    document.getElementById('lt-sub-thamkhao').classList.toggle('active',sub==='thamkhao');
+    document.getElementById('lt-sub-thucte').classList.toggle('active',sub==='thucte');
+    if(sub==='thamkhao') renderDividend();
+    if(sub==='thucte') renderDividendActual();
+}
 
 // --- CỔ ĐÔNG 股東 ---
-function showAddShareholder(){document.getElementById('addShareholderForm').classList.remove('hidden');document.getElementById('addShareholderForm').dataset.editId='';document.getElementById('sh-name').value='';document.getElementById('sh-percent').value='';document.getElementById('sh-type').value='working';document.getElementById('sh-salary').value='';document.getElementById('sh-bonus').value='';toggleShType()}
+function showAddShareholder(){document.getElementById('addShareholderForm').classList.remove('hidden');document.getElementById('addShareholderForm').dataset.editId='';document.getElementById('sh-name').value='';document.getElementById('sh-percent').value='';document.getElementById('sh-type').value='working';document.getElementById('sh-investment').value='';document.getElementById('sh-salary').value='';document.getElementById('sh-bonus').value='';toggleShType()}
 function hideAddShareholder(){document.getElementById('addShareholderForm').classList.add('hidden')}
 function toggleShType(){
     const t=document.getElementById('sh-type').value;
@@ -4476,6 +4538,7 @@ function saveShareholder(){
     const name=document.getElementById('sh-name').value.trim();
     const pct=parseFloat(document.getElementById('sh-percent').value)||0;
     const type=document.getElementById('sh-type').value;
+    const investment=parseMoney(document.getElementById('sh-investment').value);
     const salary=type==='working'?parseMoney(document.getElementById('sh-salary').value):0;
     const bonus=type==='working'?parseMoney(document.getElementById('sh-bonus').value):0;
     if(!name){alert('Vui lòng nhập tên cổ đông!');return}
@@ -4483,12 +4546,11 @@ function saveShareholder(){
     const editId=document.getElementById('addShareholderForm').dataset.editId;
     if(editId){
         const idx=shs.findIndex(s=>s.id===editId);
-        if(idx>=0) shs[idx]={...shs[idx],name,percent:pct,type,salary,bonus};
+        if(idx>=0) shs[idx]={...shs[idx],name,percent:pct,type,investment,salary,bonus};
     } else {
-        // Check total %
         const totalPct=shs.reduce((s,x)=>s+x.percent,0)+pct;
         if(totalPct>100){alert(`Tổng % không được vượt 100%! Hiện tại: ${shs.reduce((s,x)=>s+x.percent,0)}%, thêm: ${pct}%`);return}
-        shs.push({id:Date.now().toString(),name,percent:pct,type,salary,bonus});
+        shs.push({id:Date.now().toString(),name,percent:pct,type,investment,salary,bonus});
     }
     ss(SK.shareholders,shs);hideAddShareholder();renderShareholders();showToast('Đã lưu cổ đông!');
 }
@@ -4500,6 +4562,7 @@ function editShareholder(id){
     document.getElementById('sh-name').value=sh.name;
     document.getElementById('sh-percent').value=sh.percent;
     document.getElementById('sh-type').value=sh.type||'working';
+    document.getElementById('sh-investment').value=sh.investment||'';
     document.getElementById('sh-salary').value=sh.salary||'';
     document.getElementById('sh-bonus').value=sh.bonus||'';
     toggleShType();
@@ -4510,250 +4573,419 @@ function renderShareholders(){
     const totalPct=shs.reduce((s,x)=>s+x.percent,0);
     if(shs.length===0){document.getElementById('shareholderList').innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Chưa có cổ đông nào. Bấm "Thêm" để tạo.<br>尚無股東，點擊"新增"來建立</div>';return}
     let html=`<div style="padding:8px 14px;font-size:11px;color:var(--text-muted)">Tổng % đã phân bổ 已分配比例: <strong style="color:${totalPct>100?'var(--danger)':'var(--success)'}">${totalPct}%</strong> / 100%</div>`;
-    html+=`<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px;text-align:left">Tên 姓名</th><th style="padding:6px;text-align:center">Loại 類型</th><th style="padding:6px;text-align:right">% LN 利潤比例</th><th style="padding:6px;text-align:right">Lương 月薪</th><th style="padding:6px;text-align:right">Thưởng 獎金</th><th style="padding:6px"></th></tr></thead><tbody>`;
+    html+=`<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px;text-align:left">Tên 姓名</th><th style="padding:6px;text-align:center">Loại 類型</th><th style="padding:6px;text-align:right;color:var(--primary)">Vốn đầu tư 投資金額</th><th style="padding:6px;text-align:right">% LN 利潤比例</th><th style="padding:6px;text-align:right">Lương 月薪</th><th style="padding:6px;text-align:right">Thưởng 獎金</th><th style="padding:6px"></th></tr></thead><tbody>`;
     shs.forEach(sh=>{
         const typeLabel=sh.type==='working'?'<span style="color:var(--success)">✔ Làm việc 在店</span>':'<span style="color:var(--primary)">💼 Đầu tư 投資</span>';
-        html+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px;font-weight:600">${sh.name}</td><td style="padding:6px;text-align:center;font-size:10px">${typeLabel}</td><td style="padding:6px;text-align:right;font-weight:700;color:var(--primary)">${sh.percent}%</td><td style="padding:6px;text-align:right">${sh.type==='working'?fmtNum(sh.salary||0):'—'}</td><td style="padding:6px;text-align:right">${sh.type==='working'?fmtNum(sh.bonus||0):'—'}</td><td style="padding:6px;text-align:right"><button class="btn btn-primary" style="padding:2px 8px;font-size:10px;margin-right:4px" onclick="editShareholder('${sh.id}')">✏️</button><button class="btn btn-danger" style="padding:2px 8px;font-size:10px" onclick="deleteShareholder('${sh.id}')">🗑</button></td></tr>`;
+        html+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px;font-weight:600">${sh.name}</td><td style="padding:6px;text-align:center;font-size:10px">${typeLabel}</td><td style="padding:6px;text-align:right;font-weight:600;color:var(--primary)">${sh.investment?fmtNum(sh.investment):'—'}</td><td style="padding:6px;text-align:right;font-weight:700;color:var(--primary)">${sh.percent}%</td><td style="padding:6px;text-align:right">${sh.type==='working'?fmtNum(sh.salary||0):'—'}</td><td style="padding:6px;text-align:right">${sh.type==='working'?fmtNum(sh.bonus||0):'—'}</td><td style="padding:6px;text-align:right"><button class="btn btn-primary" style="padding:2px 8px;font-size:10px;margin-right:4px" onclick="editShareholder('${sh.id}')">✏️</button><button class="btn btn-danger" style="padding:2px 8px;font-size:10px" onclick="deleteShareholder('${sh.id}')">🗑</button></td></tr>`;
     });
     html+=`</tbody></table>`;
     document.getElementById('shareholderList').innerHTML=html;
 }
 
-// --- PHÚC LỢI 福利 ---
-// Benefit categories (just names)
-function showAddBenefitCat(){document.getElementById('addBenefitCatForm').style.display='';document.getElementById('bf-cat-name').value='';document.getElementById('addBenefitCatForm').dataset.editId=''}
-function hideAddBenefitCat(){document.getElementById('addBenefitCatForm').style.display='none'}
+// --- PHÚC LỢI 福利 (v3 — entry-based) ---
+// NEW entry format: {id, date:'YYYY-MM-DD', benefitId, amount, shareholderId, receiveDate:'', status:'received'|'pending', year, month}
+// year/month kept for backward compat with Tongquan & dividendPayments key format
+
+// === Benefit Categories CRUD ===
+function toggleBenefitCatManager(){var el=document.getElementById('benefitCatManagerCard');el.classList.toggle('hidden');document.getElementById('bf-cat-name').value='';document.getElementById('benefitCatManagerCard').dataset.editId=''}
+function hideAddBenefitCat(){document.getElementById('benefitCatManagerCard').classList.add('hidden')}
 function saveBenefitCat(){
     const name=document.getElementById('bf-cat-name').value.trim();
-    if(!name){alert('Vui lòng nhập tên phúc lợi!');return}
+    if(!name){showToast('Vui lòng nhập tên phúc lợi! 請輸入福利名稱');return}
     const cats=gs(SK.benefits)||[];
-    const editId=document.getElementById('addBenefitCatForm').dataset.editId;
+    const editId=document.getElementById('benefitCatManagerCard').dataset.editId;
     if(editId){const idx=cats.findIndex(c=>c.id===editId);if(idx>=0)cats[idx].name=name}
     else cats.push({id:Date.now().toString(),name});
-    ss(SK.benefits,cats);hideAddBenefitCat();renderBenefitCats();showToast('Đã lưu!');
+    ss(SK.benefits,cats);
+    document.getElementById('bf-cat-name').value='';
+    document.getElementById('benefitCatManagerCard').dataset.editId='';
+    renderBenefitCats();renderBenefitFilterBar();showToast('Đã lưu loại phúc lợi! 已儲存');
 }
 function editBenefitCat(id){
     const cats=gs(SK.benefits)||[];const c=cats.find(x=>x.id===id);if(!c)return;
-    document.getElementById('addBenefitCatForm').style.display='';
-    document.getElementById('addBenefitCatForm').dataset.editId=id;
+    document.getElementById('benefitCatManagerCard').classList.remove('hidden');
+    document.getElementById('benefitCatManagerCard').dataset.editId=id;
     document.getElementById('bf-cat-name').value=c.name;
 }
 function deleteBenefitCat(id){
-    if(!confirm('Xóa danh mục phúc lợi này? Tất cả dữ liệu áp dụng liên quan sẽ bị xóa!'))return;
+    if(!confirm('Xóa danh mục phúc lợi này? Tất cả bản ghi liên quan sẽ bị xóa!\n刪除此福利類別？所有相關記錄將被刪除！'))return;
     ss(SK.benefits,(gs(SK.benefits)||[]).filter(c=>c.id!==id));
-    // Also remove related entries
     const entries=gs(SK.benefitEntries)||[];
     ss(SK.benefitEntries,entries.filter(e=>e.benefitId!==id));
-    renderBenefitCats();renderBenefitApply();renderBenefitStats();
+    renderBenefitCats();renderBenefitEntries();renderBenefitOverview();
 }
 function renderBenefitCats(){
     const cats=gs(SK.benefits)||[];
     if(cats.length===0){document.getElementById('benefitCatList').innerHTML='<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Chưa có danh mục phúc lợi nào. Bấm "Thêm" để tạo.<br>尚無福利類別，點擊"新增"建立</div>';return}
-    let html=`<table style="width:100%;font-size:11px;border-collapse:collapse"><tbody>`;
+    let html='<table style="width:100%;font-size:11px;border-collapse:collapse"><tbody>';
     cats.forEach(c=>{
-        html+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:8px 14px;font-weight:600">${c.name}</td><td style="padding:8px;text-align:right;width:80px"><button class="btn btn-primary" style="padding:2px 8px;font-size:10px;margin-right:4px" onclick="editBenefitCat('${c.id}')">✏️</button><button class="btn btn-danger" style="padding:2px 8px;font-size:10px" onclick="deleteBenefitCat('${c.id}')">🗑</button></td></tr>`;
+        html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:8px 14px;font-weight:600">'+c.name+'</td><td style="padding:8px;text-align:right;width:80px"><button class="btn btn-primary" style="padding:2px 8px;font-size:10px;margin-right:4px" onclick="editBenefitCat(\''+c.id+'\')">✏️</button><button class="btn btn-danger" style="padding:2px 8px;font-size:10px" onclick="deleteBenefitCat(\''+c.id+'\')">🗑</button></td></tr>';
     });
-    html+=`</tbody></table>`;
+    html+='</tbody></table>';
     document.getElementById('benefitCatList').innerHTML=html;
 }
 
-// Benefit monthly entries: {id, benefitId, shareholderId, year, month, amount}
-function getBenefitEntries(year,month){return (gs(SK.benefitEntries)||[]).filter(e=>e.year===year&&e.month===month)}
+// === Migration: old format → new format ===
+function migrateBenefitEntries(){
+    const entries=gs(SK.benefitEntries)||[];
+    if(entries.length===0) return;
+    // Check if migration needed: old entries have no 'date' field
+    const needsMigration=entries.some(e=>!e.date);
+    if(!needsMigration) return;
+    const payments=gs(SK.dividendPayments)||[];
+    let changed=false;
+    entries.forEach(e=>{
+        if(!e.date){
+            // Build date from year/month (default to 1st of month)
+            const yr=e.year||2026;
+            const mo=String(e.month||1).padStart(2,'0');
+            e.date=yr+'-'+mo+'-01';
+            // Check paid status from dividendPayments
+            const pKey='bf_'+e.id+'_'+yr+'_'+(e.month||1);
+            const paidRecord=payments.find(p=>p.key===pKey);
+            if(paidRecord){
+                e.status='received';
+                e.receiveDate=paidRecord.paidAt?paidRecord.paidAt.slice(0,10):'';
+            } else {
+                e.status=e.status||'pending';
+                e.receiveDate=e.receiveDate||'';
+            }
+            // Ensure year/month are preserved
+            e.year=yr;
+            e.month=e.month||1;
+            changed=true;
+        }
+    });
+    if(changed){
+        ss(SK.benefitEntries,entries);
+        console.log('[Benefit] Migrated '+entries.length+' entries to new format');
+    }
+}
+
+// === Benefit Entry CRUD ===
+function showAddBenefitEntry(){
+    const form=document.getElementById('addBenefitEntryForm');
+    form.classList.remove('hidden');
+    form.dataset.editId='';
+    // Set default date to today
+    const today=new Date().toISOString().slice(0,10);
+    document.getElementById('bfe-date').value=today;
+    document.getElementById('bfe-amount').value='';
+    document.getElementById('bfe-receiveDate').value='';
+    document.getElementById('bfe-status').value='pending';
+    // Populate type dropdown
+    const cats=gs(SK.benefits)||[];
+    let typeHtml='<option value="">-- Chọn loại 選擇類別 --</option>';
+    cats.forEach(c=>{typeHtml+='<option value="'+c.id+'">'+c.name+'</option>'});
+    document.getElementById('bfe-type').innerHTML=typeHtml;
+    // Populate person dropdown
+    const shs=gs(SK.shareholders)||[];
+    let personHtml='<option value="">-- Chọn người 選擇對象 --</option>';
+    shs.forEach(s=>{personHtml+='<option value="'+s.id+'">'+s.name+'</option>'});
+    document.getElementById('bfe-person').innerHTML=personHtml;
+}
+function hideAddBenefitEntry(){
+    document.getElementById('addBenefitEntryForm').classList.add('hidden');
+    document.getElementById('addBenefitEntryForm').dataset.editId='';
+}
+function saveBenefitEntry(){
+    const dateVal=document.getElementById('bfe-date').value;
+    const typeVal=document.getElementById('bfe-type').value;
+    const amountVal=parseMoney(document.getElementById('bfe-amount').value);
+    const personVal=document.getElementById('bfe-person').value;
+    const recDateVal=document.getElementById('bfe-receiveDate').value||'';
+    const statusVal=document.getElementById('bfe-status').value||'pending';
+    if(!dateVal){showToast('Vui lòng chọn ngày! 請選擇日期');return}
+    if(!typeVal){showToast('Vui lòng chọn loại phúc lợi! 請選擇福利類別');return}
+    if(!amountVal||amountVal<=0){showToast('Vui lòng nhập số tiền! 請輸入金額');return}
+    if(!personVal){showToast('Vui lòng chọn người nhận! 請選擇對象');return}
+    // Parse year/month from date for backward compat
+    const dp=dateVal.split('-');
+    const yr=Number(dp[0]);
+    const mo=Number(dp[1]);
+    const entries=gs(SK.benefitEntries)||[];
+    const editId=document.getElementById('addBenefitEntryForm').dataset.editId;
+    if(editId){
+        const idx=entries.findIndex(e=>e.id===editId);
+        if(idx>=0){
+            entries[idx].date=dateVal;
+            entries[idx].benefitId=typeVal;
+            entries[idx].amount=amountVal;
+            entries[idx].shareholderId=personVal;
+            entries[idx].receiveDate=recDateVal;
+            entries[idx].status=statusVal;
+            entries[idx].year=yr;
+            entries[idx].month=mo;
+        }
+    } else {
+        entries.push({
+            id:Date.now().toString(),
+            date:dateVal,
+            benefitId:typeVal,
+            amount:amountVal,
+            shareholderId:personVal,
+            receiveDate:recDateVal,
+            status:statusVal,
+            year:yr,
+            month:mo
+        });
+    }
+    ss(SK.benefitEntries,entries);
+    hideAddBenefitEntry();
+    renderBenefitEntries();
+    renderBenefitOverview();
+    showToast(editId?'Đã cập nhật phúc lợi! 已更新':'Đã thêm phúc lợi! 已新增');
+}
+function editBenefitEntry(id){
+    const entries=gs(SK.benefitEntries)||[];
+    const e=entries.find(x=>x.id===id);if(!e)return;
+    showAddBenefitEntry();
+    document.getElementById('addBenefitEntryForm').dataset.editId=id;
+    document.getElementById('bfe-date').value=e.date||'';
+    document.getElementById('bfe-type').value=e.benefitId||'';
+    document.getElementById('bfe-amount').value=e.amount?fmtNum(e.amount):'';
+    document.getElementById('bfe-person').value=e.shareholderId||'';
+    document.getElementById('bfe-receiveDate').value=e.receiveDate||'';
+    document.getElementById('bfe-status').value=e.status||'pending';
+}
+function deleteBenefitEntry(id){
+    if(!confirm('Xóa bản ghi phúc lợi này?\n刪除此福利記錄？'))return;
+    const entries=(gs(SK.benefitEntries)||[]).filter(e=>e.id!==id);
+    ss(SK.benefitEntries,entries);
+    renderBenefitEntries();
+    renderBenefitOverview();
+    showToast('Đã xóa! 已刪除');
+}
+function toggleBenefitEntryStatus(id){
+    const entries=gs(SK.benefitEntries)||[];
+    const e=entries.find(x=>x.id===id);if(!e)return;
+    e.status=(e.status==='received')?'pending':'received';
+    if(e.status==='received'&&!e.receiveDate) e.receiveDate=new Date().toISOString().slice(0,10);
+    if(e.status==='pending') e.receiveDate='';
+    // Also sync dividendPayments for backward compat with Tongquan
+    const payments=gs(SK.dividendPayments)||[];
+    const pKey='bf_'+e.id+'_'+e.year+'_'+e.month;
+    const pIdx=payments.findIndex(p=>p.key===pKey);
+    if(e.status==='received'&&pIdx<0){
+        payments.push({key:pKey,type:'benefit',entryId:e.id,year:e.year,month:e.month,paidAt:new Date().toISOString()});
+    } else if(e.status==='pending'&&pIdx>=0){
+        payments.splice(pIdx,1);
+    }
+    ss(SK.dividendPayments,payments);
+    ss(SK.benefitEntries,entries);
+    renderBenefitEntries();
+    renderBenefitOverview();
+}
+
+// === Filter Bar ===
+var _bfFilters={month:'',type:'',person:'',status:''};
+function renderBenefitFilterBar(){
+    const cats=gs(SK.benefits)||[];
+    const shs=gs(SK.shareholders)||[];
+    const selStyle='padding:5px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;background:#fff;cursor:pointer';
+    let html='';
+    // Month filter
+    html+='<select onchange="_bfFilters.month=this.value;renderBenefitEntries()" style="'+selStyle+'">';
+    html+='<option value="">Tháng: Tất cả 全部</option>';
+    for(var i=1;i<=12;i++) html+='<option value="'+i+'"'+(String(_bfFilters.month)===String(i)?' selected':'')+'>T'+i+'</option>';
+    html+='</select>';
+    // Type filter
+    html+='<select onchange="_bfFilters.type=this.value;renderBenefitEntries()" style="'+selStyle+'">';
+    html+='<option value="">Loại: Tất cả 全部</option>';
+    cats.forEach(c=>{html+='<option value="'+c.id+'"'+(_bfFilters.type===c.id?' selected':'')+'>'+c.name+'</option>'});
+    html+='</select>';
+    // Person filter
+    html+='<select onchange="_bfFilters.person=this.value;renderBenefitEntries()" style="'+selStyle+'">';
+    html+='<option value="">Người: Tất cả 全部</option>';
+    shs.forEach(s=>{html+='<option value="'+s.id+'"'+(_bfFilters.person===s.id?' selected':'')+'>'+s.name+'</option>'});
+    html+='</select>';
+    // Status filter
+    html+='<select onchange="_bfFilters.status=this.value;renderBenefitEntries()" style="'+selStyle+'">';
+    html+='<option value=""'+(_bfFilters.status===''?' selected':'')+'>TT: Tất cả 全部</option>';
+    html+='<option value="received"'+(_bfFilters.status==='received'?' selected':'')+'>Đã nhận 已領</option>';
+    html+='<option value="pending"'+(_bfFilters.status==='pending'?' selected':'')+'>Chưa nhận 未領</option>';
+    html+='</select>';
+    document.getElementById('benefitFilterBar').innerHTML=html;
+}
+
+// === Render Entries Table ===
+function renderBenefitEntries(){
+    migrateBenefitEntries();
+    renderBenefitFilterBar();
+    const cats=gs(SK.benefits)||[];
+    const shs=gs(SK.shareholders)||[];
+    let entries=gs(SK.benefitEntries)||[];
+    // Apply filters
+    if(_bfFilters.month) entries=entries.filter(e=>e.month===Number(_bfFilters.month));
+    if(_bfFilters.type) entries=entries.filter(e=>e.benefitId===_bfFilters.type);
+    if(_bfFilters.person) entries=entries.filter(e=>e.shareholderId===_bfFilters.person);
+    if(_bfFilters.status) entries=entries.filter(e=>e.status===_bfFilters.status);
+    // Sort by date desc
+    entries.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    if(entries.length===0){
+        document.getElementById('benefitEntriesList').innerHTML='<div style="text-align:center;padding:30px 16px;color:var(--text-muted);font-size:12px">Chưa có bản ghi phúc lợi nào<br>尚無福利記錄</div>';
+        return;
+    }
+    const catMap={};cats.forEach(c=>{catMap[c.id]=c.name});
+    const shMap={};shs.forEach(s=>{shMap[s.id]=s.name});
+    let total=0;
+    let html='<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)">';
+    html+='<th style="padding:6px 8px;text-align:left">Ngày 日期</th>';
+    html+='<th style="padding:6px 8px;text-align:left">Loại 類別</th>';
+    html+='<th style="padding:6px 8px;text-align:right">Số tiền 金額</th>';
+    html+='<th style="padding:6px 8px;text-align:left">Người nhận 對象</th>';
+    html+='<th style="padding:6px 8px;text-align:left">Ngày nhận 領取日</th>';
+    html+='<th style="padding:6px 8px;text-align:center">Trạng thái 狀態</th>';
+    html+='<th style="padding:6px 8px;text-align:right;width:60px"></th>';
+    html+='</tr></thead><tbody>';
+    entries.forEach(e=>{
+        const amt=e.amount||0;
+        total+=amt;
+        const isReceived=e.status==='received';
+        const statusBadge=isReceived
+            ?'<span onclick="toggleBenefitEntryStatus(\''+e.id+'\')" style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;background:rgba(16,185,129,0.12);color:var(--success);cursor:pointer;font-weight:600">Đã nhận 已領</span>'
+            :'<span onclick="toggleBenefitEntryStatus(\''+e.id+'\')" style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;background:rgba(245,158,11,0.12);color:var(--warning);cursor:pointer;font-weight:600">Chưa nhận 未領</span>';
+        html+='<tr style="border-bottom:1px solid #f0f0f0">';
+        html+='<td style="padding:6px 8px">'+formatDateVN(e.date)+'</td>';
+        html+='<td style="padding:6px 8px">'+(catMap[e.benefitId]||'—')+'</td>';
+        html+='<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--warning)">'+fmt(amt)+'</td>';
+        html+='<td style="padding:6px 8px;font-weight:600">'+(shMap[e.shareholderId]||'—')+'</td>';
+        html+='<td style="padding:6px 8px;color:var(--text-muted)">'+(e.receiveDate?formatDateVN(e.receiveDate):'—')+'</td>';
+        html+='<td style="padding:6px 8px;text-align:center">'+statusBadge+'</td>';
+        html+='<td style="padding:6px 8px;text-align:right;white-space:nowrap">';
+        html+='<button onclick="editBenefitEntry(\''+e.id+'\')" style="padding:2px 6px;font-size:10px;background:var(--primary);color:#fff;border:none;border-radius:6px;cursor:pointer;margin-right:3px">✏️</button>';
+        html+='<button onclick="deleteBenefitEntry(\''+e.id+'\')" style="padding:2px 6px;font-size:10px;background:var(--danger);color:#fff;border:none;border-radius:6px;cursor:pointer">🗑</button>';
+        html+='</td></tr>';
+    });
+    // Footer total
+    html+='<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--primary)">';
+    html+='<td colspan="2" style="padding:6px 8px">Tổng 合計 ('+entries.length+' bản ghi 筆)</td>';
+    html+='<td style="padding:6px 8px;text-align:right;font-weight:800;color:var(--danger)">'+fmt(total)+'</td>';
+    html+='<td colspan="4"></td></tr>';
+    html+='</tbody></table>';
+    document.getElementById('benefitEntriesList').innerHTML=html;
+}
+
+// === Benefit Overview (Tổng quan) ===
+function renderBenefitOverview(){
+    migrateBenefitEntries();
+    const cats=gs(SK.benefits)||[];
+    const shs=gs(SK.shareholders)||[];
+    const allEntries=(gs(SK.benefitEntries)||[]).filter(e=>e.amount>0);
+    if(shs.length===0||allEntries.length===0){
+        document.getElementById('benefitOverviewContent').innerHTML='<div style="text-align:center;padding:30px;color:var(--text-muted);font-size:12px">Chưa có dữ liệu phúc lợi<br>尚無福利資料</div>';
+        return;
+    }
+    // Compute totals
+    let grandTotal=0,receivedTotal=0,pendingTotal=0;
+    allEntries.forEach(e=>{
+        grandTotal+=e.amount;
+        if(e.status==='received') receivedTotal+=e.amount; else pendingTotal+=e.amount;
+    });
+    let html='';
+    // --- KPI Cards ---
+    html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">';
+    html+='<div style="padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(245,158,11,0.1),rgba(245,158,11,0.03));text-align:center;border:1px solid rgba(245,158,11,0.15)">';
+    html+='<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Tổng PL 福利總額</div>';
+    html+='<div style="font-size:18px;font-weight:800;color:var(--warning)">'+fmt(grandTotal)+'</div></div>';
+    html+='<div style="padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(16,185,129,0.1),rgba(16,185,129,0.03));text-align:center;border:1px solid rgba(16,185,129,0.15)">';
+    html+='<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Đã nhận 已領</div>';
+    html+='<div style="font-size:18px;font-weight:800;color:var(--success)">'+fmt(receivedTotal)+'</div></div>';
+    html+='<div style="padding:14px;border-radius:12px;background:linear-gradient(135deg,rgba(239,68,68,0.1),rgba(239,68,68,0.03));text-align:center;border:1px solid rgba(239,68,68,0.15)">';
+    html+='<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Chưa nhận 未領</div>';
+    html+='<div style="font-size:18px;font-weight:800;color:var(--danger)">'+fmt(pendingTotal)+'</div></div>';
+    html+='</div>';
+
+    // --- Table: theo cổ đông ---
+    html+='<div class="card" style="padding:14px">';
+    html+='<div style="font-weight:700;font-size:12px;margin-bottom:10px">📋 Tổng hợp theo cổ đông 股東福利匯總</div>';
+    html+='<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)">';
+    html+='<th style="padding:6px 8px;text-align:left">Cổ đông 股東</th>';
+    html+='<th style="padding:6px 8px;text-align:right">Tổng 總額</th>';
+    html+='<th style="padding:6px 8px;text-align:right;color:var(--success)">Đã nhận 已領</th>';
+    html+='<th style="padding:6px 8px;text-align:right;color:var(--danger)">Chưa nhận 未領</th>';
+    html+='<th style="padding:6px 8px;text-align:center;width:120px">Tiến độ 進度</th>';
+    html+='</tr></thead><tbody>';
+    let shSumTotal=0,shSumRec=0,shSumPend=0;
+    shs.forEach(sh=>{
+        const shEntries=allEntries.filter(e=>e.shareholderId===sh.id);
+        let rec=0,pend=0;
+        shEntries.forEach(e=>{if(e.status==='received') rec+=e.amount; else pend+=e.amount});
+        const t=rec+pend;
+        shSumTotal+=t;shSumRec+=rec;shSumPend+=pend;
+        if(t===0) return;
+        const pct=t>0?Math.round(rec/t*100):0;
+        html+='<tr style="border-bottom:1px solid #f0f0f0">';
+        html+='<td style="padding:7px 8px;font-weight:600">'+sh.name+'</td>';
+        html+='<td style="padding:7px 8px;text-align:right;font-weight:700">'+fmt(t)+'</td>';
+        html+='<td style="padding:7px 8px;text-align:right;color:var(--success);font-weight:600">'+fmt(rec)+'</td>';
+        html+='<td style="padding:7px 8px;text-align:right;color:var(--danger);font-weight:600">'+(pend>0?fmt(pend):'—')+'</td>';
+        html+='<td style="padding:7px 8px"><div style="display:flex;align-items:center;gap:6px;justify-content:center">';
+        html+='<div style="flex:1;max-width:70px;height:6px;background:#eee;border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(pct===100?'var(--success)':'var(--warning)')+';border-radius:3px"></div></div>';
+        html+='<span style="font-size:10px;font-weight:700;color:'+(pct===100?'var(--success)':'var(--warning)')+'">'+pct+'%</span>';
+        html+='</div></td></tr>';
+    });
+    // Footer
+    var shPct=shSumTotal>0?Math.round(shSumRec/shSumTotal*100):0;
+    html+='<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--warning)">';
+    html+='<td style="padding:7px 8px">TỔNG 合計</td>';
+    html+='<td style="padding:7px 8px;text-align:right">'+fmt(shSumTotal)+'</td>';
+    html+='<td style="padding:7px 8px;text-align:right;color:var(--success)">'+fmt(shSumRec)+'</td>';
+    html+='<td style="padding:7px 8px;text-align:right;color:var(--danger)">'+(shSumPend>0?fmt(shSumPend):'—')+'</td>';
+    html+='<td style="padding:7px 8px"><div style="display:flex;align-items:center;gap:6px;justify-content:center">';
+    html+='<div style="flex:1;max-width:70px;height:6px;background:#eee;border-radius:3px;overflow:hidden"><div style="height:100%;width:'+shPct+'%;background:'+(shPct===100?'var(--success)':'var(--warning)')+';border-radius:3px"></div></div>';
+    html+='<span style="font-size:10px;font-weight:700;color:'+(shPct===100?'var(--success)':'var(--warning)')+'">'+shPct+'%</span>';
+    html+='</div></td></tr></tbody></table></div>';
+
+    // --- Table: theo tháng x loại (cross-tab) ---
+    // Collect all months present in data
+    var monthSet=new Set();
+    allEntries.forEach(e=>{if(e.month) monthSet.add(e.year*100+e.month)});
+    var monthList=[...monthSet].sort((a,b)=>a-b).map(ym=>({y:Math.floor(ym/100),m:ym%100}));
+    var activeCats=cats.filter(c=>allEntries.some(e=>e.benefitId===c.id));
+    if(monthList.length>0&&activeCats.length>0){
+        html+='<div class="card" style="padding:14px;margin-top:4px">';
+        html+='<div style="font-weight:700;font-size:12px;margin-bottom:10px">📊 Phúc lợi theo tháng & loại 月份×類別福利</div>';
+        html+='<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)">';
+        html+='<th style="padding:5px 6px;text-align:left;min-width:70px">Tháng 月</th>';
+        activeCats.forEach(c=>{html+='<th style="padding:5px 6px;text-align:right;min-width:90px">'+c.name+'</th>'});
+        html+='<th style="padding:5px 6px;text-align:right;min-width:90px;font-weight:800">Tổng 合計</th>';
+        html+='</tr></thead><tbody>';
+        var catColTotals={};activeCats.forEach(c=>{catColTotals[c.id]=0});
+        var crossGrand=0;
+        monthList.forEach(ym=>{
+            var ymEntries=allEntries.filter(e=>e.year===ym.y&&e.month===ym.m);
+            var rowTotal=0;
+            html+='<tr style="border-bottom:1px solid #f0f0f0">';
+            html+='<td style="padding:5px 6px;font-weight:600">T'+ym.m+'/'+ym.y+'</td>';
+            activeCats.forEach(c=>{
+                var catAmt=ymEntries.filter(e=>e.benefitId===c.id).reduce((s,e)=>s+e.amount,0);
+                catColTotals[c.id]+=catAmt;
+                rowTotal+=catAmt;
+                html+='<td style="padding:5px 6px;text-align:right;'+(catAmt>0?'font-weight:600':'color:#ccc')+'">'+(catAmt>0?fmtNum(catAmt):'—')+'</td>';
+            });
+            crossGrand+=rowTotal;
+            html+='<td style="padding:5px 6px;text-align:right;font-weight:700;color:var(--warning)">'+(rowTotal>0?fmt(rowTotal):'—')+'</td>';
+            html+='</tr>';
+        });
+        // Footer
+        html+='<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--primary)">';
+        html+='<td style="padding:5px 6px">TỔNG 合計</td>';
+        activeCats.forEach(c=>{
+            html+='<td style="padding:5px 6px;text-align:right;color:var(--primary)">'+fmt(catColTotals[c.id])+'</td>';
+        });
+        html+='<td style="padding:5px 6px;text-align:right;font-weight:800;color:var(--danger)">'+fmt(crossGrand)+'</td>';
+        html+='</tr></tbody></table></div></div>';
+    }
+
+    document.getElementById('benefitOverviewContent').innerHTML=html;
+}
+
+// Keep fmtInput for dividend section
 function fmtInput(el){
     const raw=el.value.replace(/[^\d]/g,'');
     el.value=raw?Number(raw).toLocaleString('vi-VN'):'';
     return raw;
-}
-function renderBenefitApply(){
-    const cats=gs(SK.benefits)||[];
-    const shs=gs(SK.shareholders)||[];
-    const y=Number(document.getElementById('bf-apply-year')?.value||2026);
-    const m=Number(document.getElementById('bf-apply-month')?.value||5);
-    const entries=getBenefitEntries(y,m);
-    if(cats.length===0||shs.length===0){document.getElementById('benefitApplyContent').innerHTML='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">Cần có danh mục phúc lợi và cổ đông 需要有福利類別和股東</div>';return}
-    // Build a clean table: rows = shareholders, columns = benefit categories
-    const activeCats=cats.filter(cat=>entries.some(e=>e.benefitId===cat.id));
-    const inactiveCats=cats.filter(cat=>!entries.some(e=>e.benefitId===cat.id));
-    let html='';
-    if(activeCats.length>0){
-        html+=`<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px;text-align:left">Cổ đông 股東</th>`;
-        activeCats.forEach(cat=>{html+=`<th style="padding:6px;text-align:right">${cat.name} <button onclick="removeBenefitMonth('${cat.id}',${y},${m})" style="font-size:8px;color:var(--danger);background:none;border:none;cursor:pointer;vertical-align:middle" title="Gỡ bỏ">✕</button></th>`});
-        html+=`<th style="padding:6px;text-align:right;font-weight:700">Tổng 合計</th></tr></thead><tbody>`;
-        let colTotals=activeCats.map(()=>0);
-        let grandTotal=0;
-        shs.forEach(sh=>{
-            let rowTotal=0;
-            html+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px;font-weight:600">${sh.name}</td>`;
-            activeCats.forEach((cat,ci)=>{
-                const entry=entries.find(e=>e.benefitId===cat.id&&e.shareholderId===sh.id);
-                const amt=entry?entry.amount:0;
-                rowTotal+=amt;colTotals[ci]+=amt;
-                const displayVal=amt?Number(amt).toLocaleString('vi-VN'):'';
-                html+=`<td style="padding:4px 6px;text-align:right"><input type="text" value="${displayVal}" placeholder="0" onblur="updateBenefitEntry('${cat.id}','${sh.id}',${y},${m},fmtInput(this))" onfocus="this.value=this.value.replace(/\\./g,'')" style="width:110px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;text-align:right"></td>`;
-            });
-            grandTotal+=rowTotal;
-            html+=`<td style="padding:6px;text-align:right;font-weight:700;color:var(--warning)">${fmt(rowTotal)}</td></tr>`;
-        });
-        html+=`<tr style="background:var(--bg-secondary);font-weight:700;border-top:2px solid var(--primary)"><td style="padding:6px">Tổng 合計</td>`;
-        colTotals.forEach(t=>{html+=`<td style="padding:6px;text-align:right;color:var(--warning)">${fmt(t)}</td>`});
-        html+=`<td style="padding:6px;text-align:right;font-weight:800;color:var(--danger)">${fmt(grandTotal)}</td></tr></tbody></table>`;
-    }
-    // Inactive categories — can be activated
-    if(inactiveCats.length>0){
-        html+=`<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="font-size:10px;color:var(--text-muted);margin-right:4px">Thêm phúc lợi tháng này 本月啟用:</span>`;
-        inactiveCats.forEach(cat=>{
-            html+=`<button onclick="addBenefitMonth('${cat.id}',${y},${m})" style="padding:4px 12px;border-radius:16px;border:1.5px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:10px;font-weight:600;cursor:pointer">+ ${cat.name}</button>`;
-        });
-        html+=`</div>`;
-    }
-    if(!html) html='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">Bấm nút bên dưới để áp dụng phúc lợi cho tháng này</div>';
-    document.getElementById('benefitApplyContent').innerHTML=html;
-}
-function addBenefitMonth(catId,year,month){
-    const shs=gs(SK.shareholders)||[];
-    const entries=gs(SK.benefitEntries)||[];
-    shs.forEach(sh=>{
-        if(!entries.some(e=>e.benefitId===catId&&e.shareholderId===sh.id&&e.year===year&&e.month===month)){
-            entries.push({id:Date.now().toString()+sh.id,benefitId:catId,shareholderId:sh.id,year,month,amount:0});
-        }
-    });
-    ss(SK.benefitEntries,entries);renderBenefitApply();
-}
-function removeBenefitMonth(catId,year,month){
-    if(!confirm('Gỡ phúc lợi này khỏi tháng '+month+'?'))return;
-    const entries=(gs(SK.benefitEntries)||[]).filter(e=>!(e.benefitId===catId&&e.year===year&&e.month===month));
-    ss(SK.benefitEntries,entries);renderBenefitApply();renderBenefitStats();
-}
-function updateBenefitEntry(catId,shId,year,month,val){
-    const entries=gs(SK.benefitEntries)||[];
-    const e=entries.find(x=>x.benefitId===catId&&x.shareholderId===shId&&x.year===year&&x.month===month);
-    if(e){e.amount=parseMoney(val);ss(SK.benefitEntries,entries);renderBenefitStats()}
-}
-
-// Benefit payment toggle
-function toggleBenefitPaid(entryId,year,month){
-    const payments=gs(SK.dividendPayments)||[];
-    const key=`bf_${entryId}_${year}_${month}`;
-    const idx=payments.findIndex(p=>p.key===key);
-    if(idx>=0) payments.splice(idx,1); else payments.push({key,type:'benefit',entryId,year:Number(year),month:Number(month),paidAt:new Date().toISOString()});
-    ss(SK.dividendPayments,payments);renderBenefitStats();
-}
-
-// Benefit stats — yearly overview with all months
-function renderBenefitStats(){
-    const cats=gs(SK.benefits)||[];
-    const shs=gs(SK.shareholders)||[];
-    const allEntries=gs(SK.benefitEntries)||[];
-    const payments=gs(SK.dividendPayments)||[];
-    if(cats.length===0||shs.length===0){document.getElementById('benefitStatsContent').innerHTML='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">Cần có danh mục phúc lợi và cổ đông 需要有福利類別和股東</div>';return}
-    if(allEntries.length===0){document.getElementById('benefitStatsContent').innerHTML='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">Chưa có phúc lợi nào được áp dụng 尚無福利記錄</div>';return}
-    // Build year-month columns from all entries
-    const ymSet=new Set();
-    allEntries.forEach(e=>ymSet.add(e.year*100+e.month));
-    const ymList=[...ymSet].sort((a,b)=>a-b).map(ym=>({y:Math.floor(ym/100),m:ym%100}));
-    // Group by year for subtotals
-    const years=[...new Set(ymList.map(x=>x.y))].sort();
-
-    let html=`<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 6px;text-align:left;position:sticky;left:0;background:#eef2f7;z-index:2;min-width:100px">Cổ đông 股東</th><th style="padding:5px 6px;text-align:left;min-width:80px">Phúc lợi 福利</th>`;
-    years.forEach(yr=>{
-        const yrMonths=ymList.filter(x=>x.y===yr);
-        yrMonths.forEach(ym=>{html+=`<th style="padding:4px;text-align:center;min-width:80px;font-size:9px">T${ym.m}/${ym.y}</th>`});
-        html+=`<th style="padding:4px;text-align:right;min-width:85px;background:rgba(99,102,241,0.06);font-size:9px;color:var(--primary)">Tổng ${yr}<br>年合計</th>`;
-    });
-    html+=`<th style="padding:4px;text-align:right;min-width:90px;background:rgba(239,68,68,0.06);font-weight:800">TỔNG<br>總合計</th></tr></thead><tbody>`;
-
-    let grandTotal=0;
-    const yearTotals={};years.forEach(yr=>{yearTotals[yr]=0});
-    const colTotals={};ymList.forEach(ym=>{colTotals[ym.y+'_'+ym.m]=0});
-
-    shs.forEach(sh=>{
-        const shEntries=allEntries.filter(e=>e.shareholderId===sh.id);
-        const shCatIds=[...new Set(shEntries.map(e=>e.benefitId))];
-        if(shCatIds.length===0) return;
-        shCatIds.forEach((catId,ci)=>{
-            const cat=cats.find(c=>c.id===catId);
-            if(!cat) return;
-            let rowTotal=0;
-            const yrRowTotals={};years.forEach(yr=>{yrRowTotals[yr]=0});
-            html+=`<tr style="border-bottom:1px solid #f0f0f0">${ci===0?`<td style="padding:5px 6px;font-weight:600;position:sticky;left:0;background:#fff;z-index:1" rowspan="${shCatIds.length}">${sh.name}</td>`:''}
-            <td style="padding:5px 6px;font-size:10px">${cat.name}</td>`;
-            years.forEach(yr=>{
-                const yrMonths=ymList.filter(x=>x.y===yr);
-                yrMonths.forEach(ym=>{
-                    const entry=shEntries.find(e=>e.benefitId===catId&&e.year===ym.y&&e.month===ym.m);
-                    if(entry&&entry.amount>0){
-                        const pKey=`bf_${entry.id}_${ym.y}_${ym.m}`;
-                        const paid=payments.some(p=>p.key===pKey);
-                        rowTotal+=entry.amount;yrRowTotals[yr]+=entry.amount;
-                        yearTotals[yr]+=entry.amount;grandTotal+=entry.amount;
-                        colTotals[ym.y+'_'+ym.m]+=entry.amount;
-                        html+=`<td style="padding:3px;text-align:center"><div style="font-weight:600">${fmtNum(entry.amount)}</div><button onclick="toggleBenefitPaid('${entry.id}',${ym.y},${ym.m})" style="padding:1px 6px;border-radius:8px;border:1px solid ${paid?'var(--success)':'#ddd'};background:${paid?'rgba(34,197,94,0.1)':'#fff'};color:${paid?'var(--success)':'#aaa'};font-size:8px;cursor:pointer">${paid?'✅':'⏳'}</button></td>`;
-                    } else {
-                        html+=`<td style="padding:3px;text-align:center;color:#ddd">—</td>`;
-                    }
-                });
-                html+=`<td style="padding:4px;text-align:right;font-weight:700;color:var(--primary);background:rgba(99,102,241,0.03)">${yrRowTotals[yr]>0?fmtNum(yrRowTotals[yr]):'—'}</td>`;
-            });
-            html+=`<td style="padding:4px;text-align:right;font-weight:800;color:var(--warning);background:rgba(239,68,68,0.03)">${rowTotal>0?fmt(rowTotal):'—'}</td></tr>`;
-        });
-    });
-    // Footer totals
-    html+=`<tr style="background:#eef2f7;font-weight:800;border-top:2px solid var(--primary)"><td colspan="2" style="padding:6px;position:sticky;left:0;background:#eef2f7;z-index:2">Tổng phúc lợi 福利合計</td>`;
-    years.forEach(yr=>{
-        const yrMonths=ymList.filter(x=>x.y===yr);
-        yrMonths.forEach(ym=>{
-            const t=colTotals[ym.y+'_'+ym.m];
-            html+=`<td style="padding:4px;text-align:center;color:var(--warning)">${t>0?fmtNum(t):'—'}</td>`;
-        });
-        html+=`<td style="padding:4px;text-align:right;color:var(--primary);background:rgba(99,102,241,0.06);font-size:11px">${fmt(yearTotals[yr])}</td>`;
-    });
-    html+=`<td style="padding:6px;text-align:right;color:var(--danger);font-size:12px;background:rgba(239,68,68,0.06)">${fmt(grandTotal)}</td></tr></tbody></table></div>`;
-
-    // Summary: per shareholder paid vs unpaid
-    html+=`<div style="margin-top:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(99,102,241,0.04),rgba(34,197,94,0.04));border-radius:10px;border:1px solid var(--border)">
-        <div style="font-weight:700;font-size:12px;margin-bottom:10px">📋 Tổng hợp theo cổ đông 股東福利匯總</div>
-        <table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)">
-            <th style="padding:6px;text-align:left">Cổ đông 股東</th>
-            <th style="padding:6px;text-align:right">Tổng phúc lợi 福利總額</th>
-            <th style="padding:6px;text-align:right;color:var(--success)">Đã nhận 已領</th>
-            <th style="padding:6px;text-align:right;color:var(--danger)">Chưa nhận 未領</th>
-            <th style="padding:6px;text-align:center">Trạng thái 狀態</th>
-        </tr></thead><tbody>`;
-    let sumPaid=0,sumUnpaid=0;
-    shs.forEach(sh=>{
-        const shEntries=allEntries.filter(e=>e.shareholderId===sh.id&&e.amount>0);
-        let paid=0,unpaid=0;
-        shEntries.forEach(entry=>{
-            const pKey=`bf_${entry.id}_${entry.year}_${entry.month}`;
-            if(payments.some(p=>p.key===pKey)) paid+=entry.amount; else unpaid+=entry.amount;
-        });
-        const total=paid+unpaid;
-        sumPaid+=paid;sumUnpaid+=unpaid;
-        if(total===0) return;
-        const pct=total>0?Math.round(paid/total*100):0;
-        html+=`<tr style="border-bottom:1px solid #f0f0f0">
-            <td style="padding:8px 6px;font-weight:600">${sh.name}</td>
-            <td style="padding:8px 6px;text-align:right;font-weight:700">${fmt(total)}</td>
-            <td style="padding:8px 6px;text-align:right;color:var(--success);font-weight:600">${fmt(paid)}</td>
-            <td style="padding:8px 6px;text-align:right;color:var(--danger);font-weight:600">${unpaid>0?fmt(unpaid):'—'}</td>
-            <td style="padding:8px 6px;text-align:center">
-                <div style="display:flex;align-items:center;gap:6px;justify-content:center">
-                    <div style="flex:1;max-width:80px;height:6px;background:#eee;border-radius:3px;overflow:hidden"><div style="height:100%;width:${pct}%;background:var(--success);border-radius:3px"></div></div>
-                    <span style="font-size:10px;font-weight:700;color:${pct===100?'var(--success)':'var(--warning)'}">${pct}%</span>
-                </div>
-            </td></tr>`;
-    });
-    const sumTotal=sumPaid+sumUnpaid;
-    const sumPct=sumTotal>0?Math.round(sumPaid/sumTotal*100):0;
-    html+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--primary)">
-        <td style="padding:8px 6px">TỔNG 合計</td>
-        <td style="padding:8px 6px;text-align:right">${fmt(sumTotal)}</td>
-        <td style="padding:8px 6px;text-align:right;color:var(--success)">${fmt(sumPaid)}</td>
-        <td style="padding:8px 6px;text-align:right;color:var(--danger)">${sumUnpaid>0?fmt(sumUnpaid):'—'}</td>
-        <td style="padding:8px 6px;text-align:center"><div style="display:flex;align-items:center;gap:6px;justify-content:center"><div style="flex:1;max-width:80px;height:6px;background:#eee;border-radius:3px;overflow:hidden"><div style="height:100%;width:${sumPct}%;background:var(--success);border-radius:3px"></div></div><span style="font-size:10px;font-weight:700;color:${sumPct===100?'var(--success)':'var(--warning)'}">${sumPct}%</span></div></td>
-    </tr></tbody></table></div>`;
-
-    document.getElementById('benefitStatsContent').innerHTML=html;
 }
 
 // --- LỢI TỨC 分紅 ---
@@ -5112,6 +5344,298 @@ function renderDividend(){
     });
     payHtml+=`</tbody></table>`;
     document.getElementById('dividendPaymentStatus').innerHTML=payHtml;
+}
+
+// --- LỢI TỨC THỰC TẾ 實際分紅 ---
+function getDividendLocks(){return gs(SK.dividendLocks)||[]}
+function saveDividendLocks(locks){ss(SK.dividendLocks,locks)}
+function lockDividend(){
+    const y=Number(document.getElementById('lt2-year').value);
+    const m=Number(document.getElementById('lt2-month').value);
+    const locks=getDividendLocks();
+    // Don't double-lock same month
+    if(locks.find(l=>l.year===y&&l.month===m)){if(!confirm('Tháng '+m+'/'+y+' đã chốt. Chốt lại sẽ GHI ĐÈ dữ liệu cũ. Tiếp tục? 本月已鎖定，重新鎖定將覆蓋舊數據。繼續？')) return;
+        const idx=locks.findIndex(l=>l.year===y&&l.month===m);if(idx>=0) locks.splice(idx,1);
+    }
+    // Snapshot current cumulative profit (full month, no cutoff)
+    const cumul=getCumulativeProfit(y,m,null);
+    const settings=getDividendSettings();
+    locks.push({
+        id:Date.now().toString(), year:y, month:m, lockedAt:new Date().toISOString(),
+        cumulProfit:cumul.profit, cumulRev:cumul.totalRev, cumulExp:cumul.totalExp,
+        byYear:cumul.byYear,
+        status:'pending'
+    });
+    saveDividendLocks(locks);
+    renderDividendActual();
+}
+function deleteDividendLock(id){
+    if(!confirm('Xóa bản chốt này? 確定刪除此鎖定？')) return;
+    const locks=getDividendLocks().filter(l=>l.id!==id);
+    saveDividendLocks(locks);
+    renderDividendActual();
+}
+function updateLockField(lockId,field,val){
+    const locks=getDividendLocks();
+    const lock=locks.find(l=>l.id===lockId);
+    if(!lock) return;
+    if(field==='taxRevenue'||field==='govSupport') lock[field]=parseMoney(val);
+    else if(field==='tggtPct'||field==='tncnPct'||field==='workingPct') lock[field]=Number(val)||0;
+    else lock[field]=val;
+    saveDividendLocks(locks);
+    renderDividendActual();
+}
+function addLockOtherFee(lockId){
+    const locks=getDividendLocks();
+    const lock=locks.find(l=>l.id===lockId);
+    if(!lock) return;
+    if(!lock.otherFees) lock.otherFees=[];
+    lock.otherFees.push({id:Date.now().toString(),name:'',amount:0});
+    saveDividendLocks(locks);
+    renderDividendActual();
+}
+function updateLockOtherFee(lockId,feeId,field,val){
+    const locks=getDividendLocks();
+    const lock=locks.find(l=>l.id===lockId);
+    if(!lock||!lock.otherFees) return;
+    const f=lock.otherFees.find(x=>x.id===feeId);
+    if(!f) return;
+    if(field==='amount') f.amount=parseMoney(val);
+    else f[field]=val;
+    saveDividendLocks(locks);
+    renderDividendActual();
+}
+function removeLockOtherFee(lockId,feeId){
+    const locks=getDividendLocks();
+    const lock=locks.find(l=>l.id===lockId);
+    if(!lock||!lock.otherFees) return;
+    lock.otherFees=lock.otherFees.filter(x=>x.id!==feeId);
+    saveDividendLocks(locks);
+    renderDividendActual();
+}
+function confirmDividendActual(lockId){
+    const locks=getDividendLocks();
+    const lock=locks.find(l=>l.id===lockId);
+    if(!lock) return;
+    lock.status=lock.status==='paid'?'pending':'paid';
+    lock.paidAt=lock.status==='paid'?new Date().toISOString():null;
+    saveDividendLocks(locks);
+    renderDividendActual();
+}
+function toggleActualDivPaid(lockId,shId){
+    const locks=getDividendLocks();
+    const lock=locks.find(l=>l.id===lockId);
+    if(!lock) return;
+    if(!lock.shares) lock.shares=[];
+    const sh=lock.shares.find(s=>s.shId===shId);
+    if(sh){sh.paid=!sh.paid;sh.paidAt=sh.paid?new Date().toISOString():null;}
+    else lock.shares.push({shId,paid:true,paidAt:new Date().toISOString()});
+    saveDividendLocks(locks);
+    renderDividendActual();
+}
+function renderDividendActual(){
+    const y=Number(document.getElementById('lt2-year').value);
+    const m=Number(document.getElementById('lt2-month').value);
+    const locks=getDividendLocks();
+    const lock=locks.find(l=>l.year===y&&l.month===m);
+    const settings=getDividendSettings();
+    const shs=gs(SK.shareholders)||[];
+
+    let html='';
+
+    // === STEP 1: Chốt LN lũy kế ===
+    const currentCumul=getCumulativeProfit(y,m,null);
+    html+=`<div style="margin-bottom:14px;padding:16px 18px;border-radius:12px;border:1.5px solid rgba(99,102,241,0.3);background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(99,102,241,0.01))">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">📊</span><div><div style="font-weight:700;font-size:13px">Bước 1: Chốt LN lũy kế 第一步：鎖定累計利潤</div><div style="font-size:10px;color:var(--text-muted)">Snapshot lợi nhuận từ 2025 → hết T${m}/${y}</div></div></div>
+            <button onclick="lockDividend()" style="padding:8px 20px;border-radius:20px;border:1.5px solid var(--primary);background:var(--primary);color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">🔒 Chốt T${m}/${y}</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div style="padding:8px 12px;background:rgba(255,255,255,0.7);border-radius:8px;border:1px solid rgba(99,102,241,0.15)">
+                <div style="font-size:10px;color:var(--text-muted)">LN hiện tại (chưa chốt) 當前利潤</div>
+                <div style="font-size:16px;font-weight:800;color:${currentCumul.profit>=0?'var(--success)':'var(--danger)'}">${fmt(currentCumul.profit)}</div>
+            </div>
+            <div style="padding:8px 12px;background:rgba(255,255,255,0.7);border-radius:8px;border:1px solid ${lock?'rgba(34,197,94,0.3)':'rgba(148,163,184,0.2)'}">
+                <div style="font-size:10px;color:var(--text-muted)">LN đã chốt 已鎖定利潤</div>
+                <div style="font-size:16px;font-weight:800;color:${lock?lock.cumulProfit>=0?'var(--success)':'var(--danger)':'var(--text-muted)'}">${lock?fmt(lock.cumulProfit):'— Chưa chốt —'}</div>
+                ${lock?`<div style="font-size:9px;color:var(--text-muted);margin-top:2px">Chốt lúc: ${new Date(lock.lockedAt).toLocaleString('vi-VN')}</div>`:''}
+            </div>
+        </div>
+    </div>`;
+
+    if(!lock){
+        html+=`<div style="text-align:center;padding:30px;color:var(--text-muted)">
+            <div style="font-size:36px;margin-bottom:8px">🔓</div>
+            <div style="font-size:13px;font-weight:600">Chưa chốt LN tháng ${m}/${y}</div>
+            <div style="font-size:11px;margin-top:4px">Bấm nút "Chốt" ở trên để bắt đầu tính lợi tức thực tế</div>
+        </div>`;
+        document.getElementById('dividendActualContent').innerHTML=html;
+        renderDividendLockHistory();
+        return;
+    }
+
+    const lockedProfit=lock.cumulProfit;
+
+    // === STEP 2: Vốn lưu động ===
+    const wPct=lock.workingPct!==undefined?lock.workingPct:settings.workingPct;
+    const workingAmt=Math.round(lockedProfit*wPct/100);
+    html+=`<div style="margin-bottom:10px;padding:14px 18px;border-radius:12px;border:1.5px solid rgba(245,158,11,0.3);background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(245,158,11,0.01))">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">💰</span><div style="font-weight:700;font-size:12px">Bước 2: Vốn lưu động 第二步：流動資金</div></div>
+            <div style="font-size:18px;font-weight:800;color:var(--warning)">${fmt(workingAmt)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,0.7);border-radius:8px;border:1px solid rgba(245,158,11,0.15)">
+            <span style="font-size:11px;font-weight:600;white-space:nowrap">Tỷ lệ 比例:</span>
+            <input type="number" value="${wPct}" min="0" max="100" step="1" onchange="updateLockField('${lock.id}','workingPct',this.value)" style="width:56px;padding:4px 6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;text-align:center;font-weight:700"><span style="font-size:11px;font-weight:600">%</span>
+            <span style="font-size:10px;color:var(--text-muted);margin-left:auto">× LN chốt: <strong>${fmtNum(lockedProfit)}</strong></span>
+        </div>
+    </div>`;
+
+    // === STEP 3: Thuế thực tế ===
+    const taxRev=lock.taxRevenue||0;
+    const govSup=lock.govSupport||0;
+    const tgPct=lock.tggtPct!==undefined?lock.tggtPct:(settings.tggtPct||3);
+    const tnPct=lock.tncnPct!==undefined?lock.tncnPct:(settings.tncnPct||1.5);
+    const tggtAmt=Math.round(taxRev*tgPct/100);
+    const tncnAmt=Math.round((taxRev-govSup)*tnPct/100);
+    const totalTax=tggtAmt+Math.max(0,tncnAmt);
+    html+=`<div style="margin-bottom:10px;padding:14px 18px;border-radius:12px;border:1.5px solid rgba(99,102,241,0.3);background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(99,102,241,0.01))">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🏛</span><div style="font-weight:700;font-size:12px">Bước 3: Thuế thực tế (cục thuế) 第三步：實際稅金</div></div>
+            <div style="font-size:18px;font-weight:800;color:var(--primary)">${fmt(totalTax)}</div>
+        </div>
+        <div style="display:grid;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,0.7);border-radius:8px;border:1px solid rgba(99,102,241,0.15)">
+                <span style="font-size:11px;font-weight:600;white-space:nowrap">DT nộp thuế 報稅營收:</span>
+                <input type="text" value="${taxRev?Number(taxRev).toLocaleString('vi-VN'):''}" placeholder="Nhập từ cục thuế" onfocus="this.value=this.value.replace(/\\./g,'')" onblur="updateLockField('${lock.id}','taxRevenue',fmtInput(this))" style="flex:1;max-width:160px;padding:4px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;text-align:right;font-weight:700">
+                <span style="font-size:9px;color:var(--warning);background:rgba(245,158,11,0.1);padding:1px 6px;border-radius:8px;font-weight:500">Nhập tay 手動</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,0.7);border-radius:8px;border:1px solid rgba(99,102,241,0.15)">
+                <span style="font-size:11px;font-weight:600;white-space:nowrap">Hỗ trợ NN 政府補助:</span>
+                <input type="text" value="${govSup?Number(govSup).toLocaleString('vi-VN'):''}" placeholder="0" onfocus="this.value=this.value.replace(/\\./g,'')" onblur="updateLockField('${lock.id}','govSupport',fmtInput(this))" style="flex:1;max-width:160px;padding:4px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;text-align:right;font-weight:700">
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+                <div style="padding:8px 12px;background:rgba(255,255,255,0.8);border-radius:8px;border:1px solid rgba(99,102,241,0.12)">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px"><span style="font-size:10px;font-weight:700">TGGT 增值稅</span><div style="display:flex;align-items:center;gap:2px"><input type="number" value="${tgPct}" min="0" max="100" step="0.1" onchange="updateLockField('${lock.id}','tggtPct',this.value)" style="width:44px;padding:2px 4px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;text-align:center;font-weight:700"><span style="font-size:10px">%</span></div></div>
+                    <div style="font-size:14px;font-weight:800;color:var(--primary)">${fmt(tggtAmt)}</div>
+                </div>
+                <div style="padding:8px 12px;background:rgba(255,255,255,0.8);border-radius:8px;border:1px solid rgba(99,102,241,0.12)">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px"><span style="font-size:10px;font-weight:700">TNCN 個人所得稅</span><div style="display:flex;align-items:center;gap:2px"><input type="number" value="${tnPct}" min="0" max="100" step="0.1" onchange="updateLockField('${lock.id}','tncnPct',this.value)" style="width:44px;padding:2px 4px;border:1.5px solid var(--border);border-radius:6px;font-size:11px;text-align:center;font-weight:700"><span style="font-size:10px">%</span></div></div>
+                    <div style="font-size:14px;font-weight:800;color:var(--primary)">${fmt(Math.max(0,tncnAmt))}</div>
+                </div>
+            </div>
+        </div>
+    </div>`;
+
+    // === STEP 4: Phí khác ===
+    const lockFees=lock.otherFees||[];
+    const totalFees=lockFees.reduce((s,f)=>s+(f.amount||0),0);
+    html+=`<div style="margin-bottom:10px;padding:14px 18px;border-radius:12px;border:1.5px solid rgba(148,163,184,0.3);background:linear-gradient(135deg,rgba(148,163,184,0.06),rgba(148,163,184,0.01))">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">📋</span><div style="font-weight:700;font-size:12px">Bước 4: Phí khác 第四步：其他費用</div></div>
+            <div style="font-size:18px;font-weight:800;color:var(--text-secondary)">${totalFees>0?fmt(totalFees):'0 ₫'}</div>
+        </div>`;
+    lockFees.forEach(f=>{
+        const amtD=f.amount?Number(f.amount).toLocaleString('vi-VN'):'';
+        html+=`<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(255,255,255,0.7);border-radius:8px;border:1px solid rgba(148,163,184,0.15);margin-bottom:4px">
+            <input type="text" value="${f.name||''}" placeholder="Tên phí" onchange="updateLockOtherFee('${lock.id}','${f.id}','name',this.value)" style="flex:1;padding:4px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:11px">
+            <input type="text" value="${amtD}" placeholder="0" onfocus="this.value=this.value.replace(/\\./g,'')" onblur="updateLockOtherFee('${lock.id}','${f.id}','amount',fmtInput(this))" style="width:110px;padding:4px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;text-align:right;font-weight:700">
+            <button onclick="removeLockOtherFee('${lock.id}','${f.id}')" style="width:24px;height:24px;border-radius:6px;border:1px solid var(--danger);background:rgba(239,68,68,0.06);color:var(--danger);font-size:10px;cursor:pointer;flex-shrink:0">✕</button>
+        </div>`;
+    });
+    html+=`<button onclick="addLockOtherFee('${lock.id}')" style="padding:5px 14px;border-radius:16px;border:1.5px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:10px;font-weight:600;cursor:pointer;margin-top:4px">+ Thêm phí 新增費用</button>
+    </div>`;
+
+    // === STEP 5: Kết quả ===
+    const totalDeduct=workingAmt+totalTax+totalFees;
+    const dividend=lockedProfit-totalDeduct;
+
+    // Deduction summary
+    html+=`<div style="margin-bottom:10px;padding:10px 18px;border-radius:12px;background:linear-gradient(135deg,rgba(239,68,68,0.08),rgba(239,68,68,0.03));border:1.5px solid rgba(239,68,68,0.2);display:flex;align-items:center;justify-content:space-between">
+        <div style="font-weight:800;font-size:12px;color:var(--danger)">🔻 Tổng khấu trừ 總扣除</div>
+        <div style="font-size:16px;font-weight:800;color:var(--danger)">${fmt(totalDeduct)}</div>
+    </div>`;
+
+    // Result table
+    let byYearHtml='';
+    if(lock.byYear){lock.byYear.forEach(yr=>{
+        byYearHtml+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 14px;padding-left:28px;font-size:10px;color:var(--text-muted)">↳ ${yr.y}: DT ${fmtNum(yr.rev)} − CT ${fmtNum(yr.exp)}</td><td style="text-align:right;padding:5px 14px;font-size:10px;color:${yr.profit>=0?'var(--success)':'var(--danger)'};font-weight:600">${fmt(yr.profit)}</td></tr>`;
+    })}
+    html+=`<table style="width:100%;font-size:11px;border-collapse:collapse;border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-bottom:14px">
+        <tr style="background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(34,197,94,0.06));border-bottom:1px solid var(--border)">
+            <td style="padding:8px 14px"><div style="font-weight:800;font-size:12px">🔒 LN đã chốt T${m}/${y} 已鎖定利潤</div></td>
+            <td style="text-align:right;font-weight:800;color:${lockedProfit>=0?'var(--success)':'var(--danger)'};padding:8px 14px;font-size:16px">${fmt(lockedProfit)}</td></tr>
+        ${byYearHtml}
+        <tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Vốn lưu động ${wPct}%</td><td style="text-align:right;padding:6px 14px;color:var(--warning);font-weight:700">${fmt(workingAmt)}</td></tr>
+        <tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Thuế TGGT ${tgPct}% + TNCN ${tnPct}%</td><td style="text-align:right;padding:6px 14px;color:var(--primary);font-weight:700">${fmt(totalTax)}</td></tr>
+        ${totalFees>0?`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Phí khác</td><td style="text-align:right;padding:6px 14px;color:var(--text-secondary);font-weight:700">${fmt(totalFees)}</td></tr>`:''}
+        <tr style="background:${dividend>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};font-weight:800;border-top:3px solid ${dividend>=0?'var(--success)':'var(--danger)'}"><td style="padding:10px 14px;font-size:13px">= Lợi tức thực tế T${m}/${y} 實際可分配利潤</td><td style="text-align:right;padding:10px 14px;color:${dividend>=0?'var(--success)':'var(--danger)'};font-size:18px">${fmt(dividend)}</td></tr>
+    </table>`;
+
+    // === SHAREHOLDER BREAKDOWN (with benefit deduction) ===
+    if(shs.length>0&&dividend!==0){
+        const allEntries=gs(SK.benefitEntries)||[];
+        html+=`<div style="margin-bottom:10px;padding:14px 18px;border-radius:12px;border:1.5px solid rgba(34,197,94,0.3);background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(34,197,94,0.01))">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:18px">👥</span><div style="font-weight:700;font-size:12px">Chia theo cổ đông 按股東分配</div></div>
+            <table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px;text-align:left">Cổ đông</th><th style="padding:5px;text-align:right">% LN</th><th style="padding:5px;text-align:right">Lợi tức</th><th style="padding:5px;text-align:right">PL đã nhận</th><th style="padding:5px;text-align:right;font-weight:800">Thực nhận</th><th style="padding:5px;text-align:center">T.Thái</th></tr></thead><tbody>`;
+        shs.forEach(sh=>{
+            const myDiv=Math.round(dividend*sh.percent/100);
+            // Calculate benefits already received this month
+            const benefitAmt=allEntries.filter(e=>e.shareholderId===sh.id&&e.status==='received').reduce((s,e)=>{
+                // Check if benefit is for this year/month based on date
+                const d=e.date?new Date(e.date):null;
+                if(d&&d.getFullYear()===y&&d.getMonth()+1===m) return s+(e.amount||0);
+                return s;
+            },0);
+            const netAmt=myDiv-benefitAmt;
+            const shPaid=lock.shares?lock.shares.find(s=>s.shId===sh.id):null;
+            const isPaid=shPaid&&shPaid.paid;
+            html+=`<tr style="border-bottom:1px solid #f0f0f0">
+                <td style="padding:6px 5px;font-weight:600">${sh.name} <span style="font-size:8px;color:var(--text-muted)">${sh.type==='working'?'在店':'投資'}</span></td>
+                <td style="padding:6px 5px;text-align:right;color:var(--primary);font-weight:700">${sh.percent}%</td>
+                <td style="padding:6px 5px;text-align:right;font-weight:600">${fmt(myDiv)}</td>
+                <td style="padding:6px 5px;text-align:right;color:var(--warning)">${benefitAmt>0?'-'+fmtNum(benefitAmt):'—'}</td>
+                <td style="padding:6px 5px;text-align:right;font-weight:800;color:${netAmt>=0?'var(--success)':'var(--danger)'}">${fmt(netAmt)}</td>
+                <td style="padding:6px 5px;text-align:center"><button onclick="toggleActualDivPaid('${lock.id}','${sh.id}')" style="padding:3px 10px;border-radius:10px;border:1px solid ${isPaid?'var(--success)':'var(--border)'};background:${isPaid?'rgba(34,197,94,0.1)':'#fff'};color:${isPaid?'var(--success)':'var(--text-muted)'};font-size:9px;font-weight:600;cursor:pointer">${isPaid?'✅ Đã chi':'⏳ Chưa'}</button></td>
+            </tr>`;
+        });
+        html+=`</tbody></table></div>`;
+    }
+
+    document.getElementById('dividendActualContent').innerHTML=html;
+    renderDividendLockHistory();
+}
+function renderDividendLockHistory(){
+    const locks=getDividendLocks().sort((a,b)=>(b.year*100+b.month)-(a.year*100+a.month));
+    if(locks.length===0){
+        document.getElementById('dividendLockHistory').innerHTML='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">Chưa có bản chốt nào 尚無鎖定記錄</div>';
+        return;
+    }
+    let html=`<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px;text-align:left">Tháng</th><th style="padding:5px;text-align:right">LN chốt</th><th style="padding:5px;text-align:right">Thuế</th><th style="padding:5px;text-align:right">Lợi tức</th><th style="padding:5px;text-align:center">T.Thái</th><th style="padding:5px;text-align:center">Ngày chốt</th><th style="padding:5px"></th></tr></thead><tbody>`;
+    locks.forEach(l=>{
+        const wP=l.workingPct!==undefined?l.workingPct:40;
+        const wA=Math.round(l.cumulProfit*wP/100);
+        const tR=l.taxRevenue||0;
+        const gS=l.govSupport||0;
+        const tgP=l.tggtPct!==undefined?l.tggtPct:3;
+        const tnP=l.tncnPct!==undefined?l.tncnPct:1.5;
+        const tgA=Math.round(tR*tgP/100);
+        const tnA=Math.round((tR-gS)*tnP/100);
+        const tT=tgA+Math.max(0,tnA);
+        const oF=(l.otherFees||[]).reduce((s,f)=>s+(f.amount||0),0);
+        const div=l.cumulProfit-wA-tT-oF;
+        html+=`<tr style="border-bottom:1px solid #f0f0f0">
+            <td style="padding:6px 5px;font-weight:700">T${l.month}/${l.year}</td>
+            <td style="padding:6px 5px;text-align:right;color:${l.cumulProfit>=0?'var(--success)':'var(--danger)'};font-weight:600">${fmtNum(l.cumulProfit)}</td>
+            <td style="padding:6px 5px;text-align:right;color:var(--primary)">${fmtNum(tT)}</td>
+            <td style="padding:6px 5px;text-align:right;font-weight:800;color:${div>=0?'var(--success)':'var(--danger)'}">${fmtNum(div)}</td>
+            <td style="padding:6px 5px;text-align:center"><span style="padding:2px 8px;border-radius:8px;font-size:9px;font-weight:600;background:${l.status==='paid'?'rgba(34,197,94,0.1)':'rgba(245,158,11,0.1)'};color:${l.status==='paid'?'var(--success)':'var(--warning)'}">${l.status==='paid'?'Đã chi 已付':'Chờ chi 待付'}</span></td>
+            <td style="padding:6px 5px;text-align:center;font-size:9px;color:var(--text-muted)">${new Date(l.lockedAt).toLocaleDateString('vi-VN')}</td>
+            <td style="padding:6px 5px;text-align:center"><button onclick="deleteDividendLock('${l.id}')" style="width:20px;height:20px;border-radius:6px;border:1px solid var(--danger);background:rgba(239,68,68,0.06);color:var(--danger);font-size:9px;cursor:pointer">✕</button></td>
+        </tr>`;
+    });
+    html+=`</tbody></table>`;
+    document.getElementById('dividendLockHistory').innerHTML=html;
 }
 
 // ========== TỔNG QUAN 總覽 ==========
