@@ -6535,50 +6535,79 @@ function parseBankStatement(){
 function parseBankTxns(raw){
     var lines=raw.split('\n').map(function(l){return l.trim()}).filter(Boolean);
     var txns=[];
-    // First pass: identify date lines and Mã GD positions
-    var dateMap={}; // line index -> YYYY-MM-DD
-    var gdPositions=[];
-    for(var i=0;i<lines.length;i++){
-        var dateMatch=lines[i].match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-        if(dateMatch){dateMap[i]=dateMatch[3]+'-'+dateMatch[2]+'-'+dateMatch[1];continue}
-        if(/^Mã GD:/.test(lines[i]))gdPositions.push(i);
+    // Detect format: new format has tab-separated fields (datetime \t desc \t amount \t balance \t txnId)
+    var newFormatCount=0;
+    for(var i=0;i<Math.min(lines.length,5);i++){
+        if(lines[i].indexOf('\t')!==-1&&/^\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2}\t/.test(lines[i]))newFormatCount++;
     }
-    // For each Mã GD, extract transaction
-    gdPositions.forEach(function(gdIdx){
-        // Find date: nearest date line before this Mã GD
-        var txnDate='';
-        for(var d=gdIdx-1;d>=0;d--){if(dateMap[d]){txnDate=dateMap[d];break}}
-        if(!txnDate)return;
-        var txnId=lines[gdIdx].replace(/^Mã GD:\s*/,'').trim();
-        // Description: lines between previous boundary and Mã GD
-        var descStart=gdIdx-1;
-        while(descStart>0){
-            var prev=descStart-1;
-            if(prev<0)break;
-            if(dateMap[prev]!==undefined)break;
-            if(/^Mã GD:/.test(lines[prev]))break;
-            if(/^\d{2}:\d{2}:\d{2}$/.test(lines[prev]))break;
-            if(/^[+-]\s*[\d,.]+\s*VND$/.test(lines[prev]))break;
-            descStart=prev;
+    if(newFormatCount>0){
+        // ===== NEW FORMAT (tab-delimited, 2026+) =====
+        // Each line: DD/MM/YYYY HH:MM:SS \t Description \t +/-Amount VND \t Balance VND \t TxnID
+        lines.forEach(function(line){
+            if(line.indexOf('\t')===-1)return;
+            var parts=line.split('\t');
+            if(parts.length<4)return;
+            // Parse datetime
+            var dtMatch=parts[0].trim().match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}:\d{2}:\d{2})$/);
+            if(!dtMatch)return;
+            var txnDate=dtMatch[3]+'-'+dtMatch[2]+'-'+dtMatch[1];
+            var timeStr=dtMatch[4];
+            // Description
+            var desc=(parts[1]||'').trim();
+            // Amount: +214,819 VND or -5,504,000 VND
+            var amtStr=(parts[2]||'').trim();
+            var amtMatch=amtStr.match(/^([+-])\s*([\d,.]+)\s*VND$/);
+            if(!amtMatch)return;
+            var isIncome=amtMatch[1]==='+';
+            var amount=parseFloat(amtMatch[2].replace(/,/g,''));
+            if(!amount||amount<=0)return;
+            // TxnId: 5th column (parts[4]), skip balance column (parts[3])
+            var txnId=(parts.length>=5?parts[4]:'').trim();
+            if(txnId.indexOf('VND')!==-1)txnId='';
+            txns.push({date:txnDate,desc:desc,amount:amount,isIncome:isIncome,txnId:txnId,time:timeStr,category:classifyBankTxn(desc)});
+        });
+    }else{
+        // ===== OLD FORMAT (multi-line with Mã GD markers) =====
+        var dateMap={};
+        var gdPositions=[];
+        for(var i=0;i<lines.length;i++){
+            var dateMatch=lines[i].match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+            if(dateMatch){dateMap[i]=dateMatch[3]+'-'+dateMatch[2]+'-'+dateMatch[1];continue}
+            if(/^Mã GD:/.test(lines[i]))gdPositions.push(i);
         }
-        var desc=[];
-        for(var k=descStart;k<gdIdx;k++){
-            if(dateMap[k]!==undefined||/^Mã GD:/.test(lines[k])||/^[+-]\s*[\d,.]+\s*VND$/.test(lines[k])||/^\d{2}:\d{2}:\d{2}$/.test(lines[k]))continue;
-            desc.push(lines[k]);
-        }
-        var descText=desc.join(' ');
-        // Amount & time: look forward from Mã GD
-        var amount=0,isIncome=false,timeStr='';
-        for(var f=gdIdx+1;f<lines.length&&f<=gdIdx+3;f++){
-            var amtMatch=lines[f].match(/^([+-])\s*([\d,.]+)\s*VND$/);
-            if(amtMatch){isIncome=amtMatch[1]==='+';amount=parseFloat(amtMatch[2].replace(/,/g,''));continue}
-            var timeMatch=lines[f].match(/^(\d{2}:\d{2}:\d{2})$/);
-            if(timeMatch){timeStr=timeMatch[1];continue}
-        }
-        if(amount>0){
-            txns.push({date:txnDate,desc:descText,amount:amount,isIncome:isIncome,txnId:txnId,time:timeStr,category:classifyBankTxn(descText)});
-        }
-    });
+        gdPositions.forEach(function(gdIdx){
+            var txnDate='';
+            for(var d=gdIdx-1;d>=0;d--){if(dateMap[d]){txnDate=dateMap[d];break}}
+            if(!txnDate)return;
+            var txnId=lines[gdIdx].replace(/^Mã GD:\s*/,'').trim();
+            var descStart=gdIdx-1;
+            while(descStart>0){
+                var prev=descStart-1;
+                if(prev<0)break;
+                if(dateMap[prev]!==undefined)break;
+                if(/^Mã GD:/.test(lines[prev]))break;
+                if(/^\d{2}:\d{2}:\d{2}$/.test(lines[prev]))break;
+                if(/^[+-]\s*[\d,.]+\s*VND$/.test(lines[prev]))break;
+                descStart=prev;
+            }
+            var desc=[];
+            for(var k=descStart;k<gdIdx;k++){
+                if(dateMap[k]!==undefined||/^Mã GD:/.test(lines[k])||/^[+-]\s*[\d,.]+\s*VND$/.test(lines[k])||/^\d{2}:\d{2}:\d{2}$/.test(lines[k]))continue;
+                desc.push(lines[k]);
+            }
+            var descText=desc.join(' ');
+            var amount=0,isIncome=false,timeStr='';
+            for(var f=gdIdx+1;f<lines.length&&f<=gdIdx+3;f++){
+                var amtMatch=lines[f].match(/^([+-])\s*([\d,.]+)\s*VND$/);
+                if(amtMatch){isIncome=amtMatch[1]==='+';amount=parseFloat(amtMatch[2].replace(/,/g,''));continue}
+                var timeMatch=lines[f].match(/^(\d{2}:\d{2}:\d{2})$/);
+                if(timeMatch){timeStr=timeMatch[1];continue}
+            }
+            if(amount>0){
+                txns.push({date:txnDate,desc:descText,amount:amount,isIncome:isIncome,txnId:txnId,time:timeStr,category:classifyBankTxn(descText)});
+            }
+        });
+    }
     txns.sort(function(a,b){
         if(a.date!==b.date)return b.date.localeCompare(a.date);
         return (b.time||'').localeCompare(a.time||'');
