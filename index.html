@@ -899,6 +899,7 @@
                 <div class="tab" onclick="switchLoitucTab('phucloi')">Phúc lợi 福利</div>
                 <div class="tab" onclick="switchLoitucTab('loituc')">Lợi tức 分紅</div>
                 <div class="tab" onclick="switchLoitucTab('tongquan')">Tổng quan 總覽</div>
+                <div class="tab" onclick="switchLoitucTab('quydb')">Quỹ dự bị 準備金</div>
             </div>
 
             <!-- TAB: CỔ ĐÔNG 股東 -->
@@ -1037,6 +1038,43 @@
             <!-- TAB: TỔNG QUAN 總覽 -->
             <div id="loituc-tab-tongquan" style="display:none">
                 <div id="loitucOverviewContent"></div>
+            </div>
+
+            <!-- TAB: QUỸ DỰ BỊ 準備金 -->
+            <div id="loituc-tab-quydb" style="display:none">
+                <!-- KPI Cards -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:16px" id="rfKpiCards"></div>
+                <!-- Monthly Accumulation History -->
+                <div class="card">
+                    <div class="card-header"><h3>Lịch sử tích lũy theo tháng <span style="font-size:12px;font-weight:400;color:var(--text-muted)">每月累積記錄</span></h3></div>
+                    <div class="table-wrap" id="rfMonthlyHistory"></div>
+                </div>
+                <!-- Ad-hoc Transactions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Giao dịch phát sinh <span style="font-size:12px;font-weight:400;color:var(--text-muted)">其他交易</span></h3>
+                    </div>
+                    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:flex-end">
+                        <div><label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:2px">Loại</label>
+                        <select id="rfTxnType" style="padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px">
+                            <option value="deposit">Nạp thêm 存入</option>
+                            <option value="withdrawal">Rút ra 提取</option>
+                        </select></div>
+                        <div style="flex:1;min-width:100px"><label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:2px">Số tiền</label>
+                        <input type="text" id="rfTxnAmt" placeholder="Số tiền" oninput="formatAmountInput(this)" style="width:100%;padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px"></div>
+                        <div><label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:2px">Ngày</label>
+                        <input type="date" id="rfTxnDate" style="padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px"></div>
+                        <div style="flex:1;min-width:80px"><label style="font-size:10px;color:var(--text-muted);display:block;margin-bottom:2px">Ghi chú</label>
+                        <input type="text" id="rfTxnNote" placeholder="Ghi chú" style="width:100%;padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px"></div>
+                        <button class="btn btn-primary btn-sm" onclick="addReserveTxn()" style="padding:7px 14px;white-space:nowrap">+ Thêm</button>
+                    </div>
+                    <div class="table-wrap" id="rfAdHocTable"></div>
+                </div>
+                <!-- Accumulation Chart -->
+                <div class="card">
+                    <div class="card-header"><h3>Biểu đồ tích lũy <span style="font-size:12px;font-weight:400;color:var(--text-muted)">累積圖表</span></h3></div>
+                    <div id="rfChartArea" style="height:200px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:13px"></div>
+                </div>
             </div>
         </div>
 
@@ -1397,7 +1435,7 @@ function wrapDateInputs(){
     });
 }
 // ========== STORE ==========
-const SK={users:'qg_users',expenses:'qg_expenses',revenues:'qg_revenues',shifts:'qg_shifts',session:'qg_session',categories:'qg_categories',suppliers:'qg_suppliers',shareholders:'qg_shareholders',benefits:'qg_benefits',benefitEntries:'qg_benefit_entries',dividendSettings:'qg_dividend_settings',dividendPayments:'qg_dividend_payments',otherFees:'qg_other_fees',dividendSkip:'qg_dividend_skip',taxRevManual:'qg_tax_rev_manual',dividendLocks:'qg_dividend_locks'};
+const SK={users:'qg_users',expenses:'qg_expenses',revenues:'qg_revenues',shifts:'qg_shifts',session:'qg_session',categories:'qg_categories',suppliers:'qg_suppliers',shareholders:'qg_shareholders',benefits:'qg_benefits',benefitEntries:'qg_benefit_entries',dividendSettings:'qg_dividend_settings',dividendPayments:'qg_dividend_payments',otherFees:'qg_other_fees',dividendSkip:'qg_dividend_skip',taxRevManual:'qg_tax_rev_manual',dividendLocks:'qg_dividend_locks',reserveFund:'qg_reserve_fund'};
 const _mem={};
 function gs(k){if(_mem[k]!==undefined)return _mem[k];const d=localStorage.getItem(k);if(d){var p=JSON.parse(d);_mem[k]=p;return p}return null}
 function ss(k,d){_mem[k]=d;try{localStorage.setItem(k,JSON.stringify(d))}catch(e){console.warn('localStorage full, key='+k,e)}}
@@ -4503,18 +4541,194 @@ function renderProfitStats(){
 
 // ========== LỢI TỨC 利潤分配 ==========
 function switchLoitucTab(tab){
-    ['codong','phucloi','loituc','tongquan'].forEach(t=>{
+    ['codong','phucloi','loituc','tongquan','quydb'].forEach(t=>{
         var el=document.getElementById('loituc-tab-'+t);if(el)el.style.display=t===tab?'':'none';
     });
     document.querySelectorAll('#page-loituc > .tabs > .tab').forEach((el,i)=>{
-        el.classList.toggle('active',['codong','phucloi','loituc','tongquan'][i]===tab);
+        el.classList.toggle('active',['codong','phucloi','loituc','tongquan','quydb'][i]===tab);
     });
     if(tab==='codong') renderShareholders();
     if(tab==='phucloi'){renderBenefitCats();renderBenefitEntries();renderBenefitOverview()}
     if(tab==='loituc') renderDividend();
     if(tab==='tongquan') renderLoitucOverview();
+    if(tab==='quydb') renderReserveFund();
 }
 function initLoitucPage(){renderShareholders();renderBenefitCats();renderBenefitEntries();renderBenefitOverview();renderDividend()}
+
+// ========== QUỸ DỰ BỊ 準備金 ==========
+function getRfData(){
+    var d=gs(SK.reserveFund);
+    if(!d) d={transactions:[]};
+    if(!d.transactions) d.transactions=[];
+    return d;
+}
+function saveRfData(d){ss(SK.reserveFund,d)}
+
+function getReserveFromLocks(){
+    // Collect reserve amounts from all dividend locks
+    var locks=getDividendLocks();
+    var items=[];
+    locks.forEach(function(l){
+        if(l.reserveAmt&&l.reserveAmt>0){
+            items.push({month:'T'+l.month+'/'+l.year,date:l.year+'-'+('0'+l.month).slice(-2),amount:l.reserveAmt,source:'lock'});
+        }
+    });
+    return items.sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0});
+}
+
+function renderReserveFund(){
+    var d=getRfData();
+    var lockItems=getReserveFromLocks();
+    var adHocTxns=d.transactions.sort(function(a,b){return a.date<b.date?-1:a.date>b.date?1:0});
+
+    // Calculate totals
+    var totalFromLocks=0;
+    lockItems.forEach(function(i){totalFromLocks+=i.amount});
+    var totalAdHocIn=0,totalAdHocOut=0;
+    adHocTxns.forEach(function(t){
+        if(t.type==='withdrawal') totalAdHocOut+=Number(t.amount)||0;
+        else totalAdHocIn+=Number(t.amount)||0;
+    });
+    var balance=totalFromLocks+totalAdHocIn-totalAdHocOut;
+
+    // KPI Cards
+    var kpi='';
+    kpi+='<div class="card" style="padding:14px;text-align:center;border-left:4px solid #10b981">';
+    kpi+='<div style="font-size:10px;color:var(--text-muted);font-weight:600">SỐ DƯ QUỸ 準備金餘額</div>';
+    kpi+='<div style="font-size:22px;font-weight:800;color:#10b981;margin:4px 0">'+fmtNum(balance)+'</div>';
+    kpi+='<div style="font-size:10px;color:var(--text-muted)">VNĐ</div></div>';
+
+    kpi+='<div class="card" style="padding:14px;text-align:center;border-left:4px solid var(--primary)">';
+    kpi+='<div style="font-size:10px;color:var(--text-muted);font-weight:600">TỪ LỢI TỨC 從利潤扣除</div>';
+    kpi+='<div style="font-size:18px;font-weight:700;color:var(--primary);margin:4px 0">'+fmtNum(totalFromLocks)+'</div>';
+    kpi+='<div style="font-size:10px;color:var(--text-muted)">'+lockItems.length+' tháng đã chốt</div></div>';
+
+    kpi+='<div class="card" style="padding:14px;text-align:center;border-left:4px solid var(--success)">';
+    kpi+='<div style="font-size:10px;color:var(--text-muted);font-weight:600">NẠP THÊM 額外存入</div>';
+    kpi+='<div style="font-size:18px;font-weight:700;color:var(--success);margin:4px 0">'+fmtNum(totalAdHocIn)+'</div>';
+    kpi+='<div style="font-size:10px;color:var(--text-muted)">Giao dịch phát sinh</div></div>';
+
+    kpi+='<div class="card" style="padding:14px;text-align:center;border-left:4px solid var(--danger)">';
+    kpi+='<div style="font-size:10px;color:var(--text-muted);font-weight:600">ĐÃ RÚT 已提取</div>';
+    kpi+='<div style="font-size:18px;font-weight:700;color:var(--danger);margin:4px 0">'+fmtNum(totalAdHocOut)+'</div>';
+    kpi+='<div style="font-size:10px;color:var(--text-muted)">Giao dịch phát sinh</div></div>';
+
+    document.getElementById('rfKpiCards').innerHTML=kpi;
+
+    // Monthly accumulation from locks
+    var mh='';
+    if(lockItems.length===0){
+        mh='<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:12px">Chưa có tháng nào chốt quỹ dự bị. Vào tab Lợi tức → Thực tế → nhập số tiền ở Bước 3.</div>';
+    } else {
+        mh='<table><thead><tr><th style="font-size:11px">Tháng 月份</th><th style="font-size:11px;text-align:right">Số tiền trích 扣除金額</th><th style="font-size:11px;text-align:right">Tích lũy 累積</th></tr></thead><tbody>';
+        var cum=0;
+        lockItems.forEach(function(i){
+            cum+=i.amount;
+            mh+='<tr><td style="font-size:12px;font-weight:600;padding:6px 8px">'+i.month+'</td>';
+            mh+='<td style="text-align:right;font-size:12px;font-weight:600;color:#10b981;padding:6px 8px">+'+fmtNum(i.amount)+'</td>';
+            mh+='<td style="text-align:right;font-size:12px;font-weight:700;padding:6px 8px">'+fmtNum(cum)+'</td></tr>';
+        });
+        mh+='</tbody></table>';
+    }
+    document.getElementById('rfMonthlyHistory').innerHTML=mh;
+
+    // Set default date for ad-hoc form
+    var dateInp=document.getElementById('rfTxnDate');
+    if(dateInp&&!dateInp.value) dateInp.value=todayVN();
+
+    // Ad-hoc transactions table
+    var ah='';
+    if(adHocTxns.length===0){
+        ah='<div style="text-align:center;padding:14px;color:var(--text-muted);font-size:11px">Chưa có giao dịch phát sinh 暫無其他交易</div>';
+    } else {
+        ah='<table><thead><tr><th style="font-size:11px">Ngày</th><th style="font-size:11px">Loại</th><th style="font-size:11px;text-align:right">Số tiền</th><th style="font-size:11px">Ghi chú</th><th></th></tr></thead><tbody>';
+        adHocTxns.forEach(function(t){
+            var isDep=t.type!=='withdrawal';
+            ah+='<tr>';
+            ah+='<td style="font-size:11px">'+formatDateVN(t.date)+'</td>';
+            ah+='<td style="font-size:11px">'+(isDep?'<span style="color:var(--success)">⬆ Nạp</span>':'<span style="color:var(--danger)">⬇ Rút</span>')+'</td>';
+            ah+='<td style="text-align:right;font-size:12px;font-weight:600;color:'+(isDep?'var(--success)':'var(--danger)')+'">'+(isDep?'+':'-')+fmtNum(t.amount)+'</td>';
+            ah+='<td style="font-size:11px">'+escHtml(t.note||'')+'</td>';
+            ah+='<td><button class="btn btn-outline btn-xs" onclick="deleteReserveTxn(\''+t.id+'\')" style="color:var(--danger);font-size:10px">✕</button></td>';
+            ah+='</tr>';
+        });
+        ah+='</tbody></table>';
+    }
+    document.getElementById('rfAdHocTable').innerHTML=ah;
+
+    // Chart
+    renderRfChart(lockItems,adHocTxns);
+}
+
+function addReserveTxn(){
+    var type=document.getElementById('rfTxnType').value;
+    var amt=parseFormattedNum(document.getElementById('rfTxnAmt').value);
+    var date=document.getElementById('rfTxnDate').value;
+    var note=document.getElementById('rfTxnNote').value.trim();
+    if(!amt||amt<=0){showToast('Vui lòng nhập số tiền 請輸入金額','error');return}
+    if(!date){showToast('Vui lòng chọn ngày 請選擇日期','error');return}
+    var d=getRfData();
+    d.transactions.push({
+        id:String(Date.now())+String(Math.random()).substring(2,6),
+        date:date,type:type,amount:amt,
+        note:note||(type==='withdrawal'?'Rút quỹ dự bị':'Nạp thêm quỹ dự bị'),
+        createdAt:new Date().toISOString(),
+        user:currentUser?currentUser.username:''
+    });
+    saveRfData(d);
+    document.getElementById('rfTxnAmt').value='';
+    document.getElementById('rfTxnNote').value='';
+    showToast((type==='withdrawal'?'Đã rút ':'Đã nạp ')+fmtNum(amt)+' 已完成','success');
+    renderReserveFund();
+}
+
+function deleteReserveTxn(id){
+    if(!confirm('Xóa giao dịch này? 確定刪除？')) return;
+    var d=getRfData();
+    d.transactions=d.transactions.filter(function(t){return t.id!==id});
+    saveRfData(d);
+    showToast('Đã xóa 已刪除','success');
+    renderReserveFund();
+}
+
+function renderRfChart(lockItems,adHocTxns){
+    var area=document.getElementById('rfChartArea');
+    if(!area) return;
+    if(lockItems.length===0&&adHocTxns.length===0){
+        area.innerHTML='<span>Chưa có dữ liệu 暫無資料</span>';return;
+    }
+    // Merge all into monthly buckets
+    var months={};
+    lockItems.forEach(function(i){
+        var k=i.date;if(!months[k])months[k]={add:0,sub:0};months[k].add+=i.amount;
+    });
+    adHocTxns.forEach(function(t){
+        var k=t.date.substring(0,7);if(!months[k])months[k]={add:0,sub:0};
+        if(t.type==='withdrawal') months[k].sub+=Number(t.amount)||0;
+        else months[k].add+=Number(t.amount)||0;
+    });
+    var keys=Object.keys(months).sort();
+    var maxVal=0,cum=0,cumData=[];
+    keys.forEach(function(k){
+        cum+=months[k].add-months[k].sub;
+        cumData.push({month:k,balance:cum});
+        if(cum>maxVal) maxVal=cum;
+    });
+    if(maxVal<=0) maxVal=1;
+    var ch='<div style="width:100%;display:flex;align-items:flex-end;gap:8px;height:180px;padding:0 4px">';
+    cumData.forEach(function(c){
+        var pct=Math.max(5,Math.round(c.balance/maxVal*160));
+        var label=c.month.substring(5);
+        ch+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">';
+        ch+='<div style="font-size:9px;font-weight:600;color:#10b981">'+fmtNum(c.balance)+'</div>';
+        ch+='<div style="width:100%;max-width:48px;height:'+pct+'px;background:linear-gradient(180deg,#10b981,#059669);border-radius:4px 4px 0 0;min-height:5px"></div>';
+        ch+='<div style="font-size:9px;color:var(--text-muted)">T'+label+'</div>';
+        ch+='</div>';
+    });
+    ch+='</div>';
+    area.innerHTML=ch;
+}
+
 function switchPLSub(sub){
     document.getElementById('pl-content-danhsach').style.display=sub==='danhsach'?'':'none';
     document.getElementById('pl-content-tongquan').style.display=sub==='tongquan'?'':'none';
@@ -5606,7 +5820,7 @@ function updateLockField(lockId,field,val){
     const locks=getDividendLocks();
     const lock=locks.find(l=>l.id===lockId);
     if(!lock) return;
-    if(field==='taxRevenue'||field==='govSupport') lock[field]=parseMoney(val);
+    if(field==='taxRevenue'||field==='govSupport'||field==='reserveAmt') lock[field]=parseMoney(val);
     else if(field==='tggtPct'||field==='tncnPct'||field==='workingPct') lock[field]=Number(val)||0;
     else lock[field]=val;
     saveDividendLocks(locks);
@@ -5719,7 +5933,21 @@ function renderDividendActual(){
         </div>
     </div>`;
 
-    // === STEP 3: Thuế thực tế ===
+    // === STEP 3: Quỹ dự bị ===
+    const reserveAmt=lock.reserveAmt||0;
+    html+=`<div style="margin-bottom:10px;padding:14px 18px;border-radius:12px;border:1.5px solid rgba(16,185,129,0.3);background:linear-gradient(135deg,rgba(16,185,129,0.06),rgba(16,185,129,0.01))">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🏦</span><div style="font-weight:700;font-size:12px">Bước 3: Quỹ dự bị 第三步：準備金</div></div>
+            <div style="font-size:18px;font-weight:800;color:#10b981">${reserveAmt>0?fmt(reserveAmt):'0 ₫'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(255,255,255,0.7);border-radius:8px;border:1px solid rgba(16,185,129,0.15)">
+            <span style="font-size:11px;font-weight:600;white-space:nowrap">Số tiền trích 準備金額:</span>
+            <input type="text" value="${reserveAmt?Number(reserveAmt).toLocaleString('vi-VN'):''}" placeholder="Nhập số tiền" onfocus="this.value=this.value.replace(/\\./g,'')" onblur="updateLockField('${lock.id}','reserveAmt',fmtInput(this))" style="flex:1;max-width:180px;padding:4px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;text-align:right;font-weight:700">
+            <span style="font-size:9px;color:var(--text-muted)">Trích từ vốn lưu động → tích lũy tại tab Quỹ dự bị</span>
+        </div>
+    </div>`;
+
+    // === STEP 4: Thuế thực tế ===
     const taxRev=lock.taxRevenue||0;
     const govSup=lock.govSupport||0;
     const tgPct=lock.tggtPct!==undefined?lock.tggtPct:(settings.tggtPct||3);
@@ -5729,7 +5957,7 @@ function renderDividendActual(){
     const totalTax=tggtAmt+Math.max(0,tncnAmt);
     html+=`<div style="margin-bottom:10px;padding:14px 18px;border-radius:12px;border:1.5px solid rgba(99,102,241,0.3);background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(99,102,241,0.01))">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🏛</span><div style="font-weight:700;font-size:12px">Bước 3: Thuế thực tế (cục thuế) 第三步：實際稅金</div></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">🏛</span><div style="font-weight:700;font-size:12px">Bước 4: Thuế thực tế (cục thuế) 第四步：實際稅金</div></div>
             <div style="font-size:18px;font-weight:800;color:var(--primary)">${fmt(totalTax)}</div>
         </div>
         <div style="display:grid;gap:6px">
@@ -5755,12 +5983,12 @@ function renderDividendActual(){
         </div>
     </div>`;
 
-    // === STEP 4: Phí khác ===
+    // === STEP 5: Phí khác ===
     const lockFees=lock.otherFees||[];
     const totalFees=lockFees.reduce((s,f)=>s+(f.amount||0),0);
     html+=`<div style="margin-bottom:10px;padding:14px 18px;border-radius:12px;border:1.5px solid rgba(148,163,184,0.3);background:linear-gradient(135deg,rgba(148,163,184,0.06),rgba(148,163,184,0.01))">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">📋</span><div style="font-weight:700;font-size:12px">Bước 4: Phí khác 第四步：其他費用</div></div>
+            <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">📋</span><div style="font-weight:700;font-size:12px">Bước 5: Phí khác 第五步：其他費用</div></div>
             <div style="font-size:18px;font-weight:800;color:var(--text-secondary)">${totalFees>0?fmt(totalFees):'0 ₫'}</div>
         </div>`;
     lockFees.forEach(f=>{
@@ -5774,8 +6002,8 @@ function renderDividendActual(){
     html+=`<button onclick="addLockOtherFee('${lock.id}')" style="padding:5px 14px;border-radius:16px;border:1.5px dashed var(--primary);background:var(--primary-light);color:var(--primary);font-size:10px;font-weight:600;cursor:pointer;margin-top:4px">+ Thêm phí 新增費用</button>
     </div>`;
 
-    // === STEP 5: Kết quả ===
-    const totalDeduct=workingAmt+totalTax+totalFees;
+    // === STEP 6: Kết quả ===
+    const totalDeduct=workingAmt+reserveAmt+totalTax+totalFees;
     const dividend=lockedProfit-totalDeduct;
 
     // Deduction summary
@@ -5795,6 +6023,7 @@ function renderDividendActual(){
             <td style="text-align:right;font-weight:800;color:${lockedProfit>=0?'var(--success)':'var(--danger)'};padding:8px 14px;font-size:16px">${fmt(lockedProfit)}</td></tr>
         ${byYearHtml}
         <tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Vốn lưu động ${wPct}%</td><td style="text-align:right;padding:6px 14px;color:var(--warning);font-weight:700">${fmt(workingAmt)}</td></tr>
+        ${reserveAmt>0?`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Quỹ dự bị 準備金</td><td style="text-align:right;padding:6px 14px;color:#10b981;font-weight:700">${fmt(reserveAmt)}</td></tr>`:''}
         <tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Thuế TGGT ${tgPct}% + TNCN ${tnPct}%</td><td style="text-align:right;padding:6px 14px;color:var(--primary);font-weight:700">${fmt(totalTax)}</td></tr>
         ${totalFees>0?`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Phí khác</td><td style="text-align:right;padding:6px 14px;color:var(--text-secondary);font-weight:700">${fmt(totalFees)}</td></tr>`:''}
         <tr style="background:${dividend>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};font-weight:800;border-top:3px solid ${dividend>=0?'var(--success)':'var(--danger)'}"><td style="padding:10px 14px;font-size:13px">= Lợi tức thực tế T${m}/${y} 實際可分配利潤</td><td style="text-align:right;padding:10px 14px;color:${dividend>=0?'var(--success)':'var(--danger)'};font-size:18px">${fmt(dividend)}</td></tr>
@@ -8199,3 +8428,4 @@ if(getSheetUrl()){
 </script>
 </body>
 </html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         
