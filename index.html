@@ -4434,7 +4434,10 @@ function renderProfitStats(){
         const years=[...new Set([...allExps.map(e=>new Date(e.date).getFullYear()),...allRevs.map(r=>new Date(r.date).getFullYear())])].sort();
         const yearData=years.map(y=>{const yRevs=allRevs.filter(r=>new Date(r.date).getFullYear()===y);const tip=yRevs.reduce((s,r)=>s+(r.tip||0),0);const rev=yRevs.reduce((s,r)=>s+(r.totalActual||0),0)-tip;const exp=allExps.filter(e=>new Date(e.date).getFullYear()===y).reduce((s,e)=>s+e.amount,0);return{y,rev,exp,profit:rev-exp}});
         const tRev=yearData.reduce((s,d)=>s+d.rev,0),tExp=yearData.reduce((s,d)=>s+d.exp,0),tProfit=tRev-tExp;
-        document.getElementById('profitStatsCards').innerHTML=`<div style="display:grid;grid-template-columns:repeat(${Math.min(yearData.length+1,5)},1fr);gap:8px">${yearData.map(d=>`<div style="text-align:center;padding:10px;background:${d.profit>=0?'rgba(34,197,94,0.06)':'rgba(239,68,68,0.06)'};border-radius:8px;border:1.5px solid ${d.profit>=0?'var(--success)':'var(--danger)'}"><div style="font-size:9px;color:var(--text-muted)">LN ${d.y} 利潤</div><div style="font-weight:800;color:${d.profit>=0?'var(--success)':'var(--danger)'};font-size:13px">${fmt(d.profit)}</div><div style="font-size:8px;color:var(--text-muted)">${d.rev>0?(d.profit/d.rev*100).toFixed(1):'0'}%</div></div>`).join('')}<div style="text-align:center;padding:10px;background:${tProfit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};border-radius:8px;border:2px solid ${tProfit>=0?'var(--success)':'var(--danger)'}"><div style="font-size:9px;color:var(--text-muted)">Tổng 總計</div><div style="font-weight:800;color:${tProfit>=0?'var(--success)':'var(--danger)'};font-size:13px">${fmt(tProfit)}</div></div></div>`;
+        const _dvLocksAll=getDividendLocks().filter(l=>l.status==='paid');
+        const _totalDivPaidAll=_dvLocksAll.reduce((s,l)=>s+(l.paidTotal||0),0);
+        const _availProfitAll=tProfit-_totalDivPaidAll;
+        document.getElementById('profitStatsCards').innerHTML=`<div style="display:grid;grid-template-columns:repeat(${Math.min(yearData.length+1,5)},1fr);gap:8px">${yearData.map(d=>`<div style="text-align:center;padding:10px;background:${d.profit>=0?'rgba(34,197,94,0.06)':'rgba(239,68,68,0.06)'};border-radius:8px;border:1.5px solid ${d.profit>=0?'var(--success)':'var(--danger)'}"><div style="font-size:9px;color:var(--text-muted)">LN ${d.y} 利潤</div><div style="font-weight:800;color:${d.profit>=0?'var(--success)':'var(--danger)'};font-size:13px">${fmt(d.profit)}</div><div style="font-size:8px;color:var(--text-muted)">${d.rev>0?(d.profit/d.rev*100).toFixed(1):'0'}%</div></div>`).join('')}<div style="text-align:center;padding:10px;background:${tProfit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};border-radius:8px;border:2px solid ${tProfit>=0?'var(--success)':'var(--danger)'}"><div style="font-size:9px;color:var(--text-muted)">Tổng 總計</div><div style="font-weight:800;color:${tProfit>=0?'var(--success)':'var(--danger)'};font-size:13px">${fmt(tProfit)}</div></div></div>${_totalDivPaidAll>0?`<div style="margin-top:8px;padding:10px 12px;background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(99,102,241,0.06));border-radius:8px;border:1.5px solid rgba(245,158,11,0.3)"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><div style="text-align:center"><div style="font-size:8px;color:var(--text-muted)">LN gốc 原始利潤</div><div style="font-weight:700;font-size:12px">${fmt(tProfit)}</div></div><div style="font-size:16px;color:var(--text-muted)">−</div><div style="text-align:center"><div style="font-size:8px;color:#f59e0b;font-weight:600">LT đã chi 已付分紅</div><div style="font-weight:700;font-size:12px;color:#f59e0b">${fmt(_totalDivPaidAll)}</div><div style="font-size:8px;color:var(--text-muted)">${_dvLocksAll.length} lần chi</div></div><div style="font-size:16px;color:var(--text-muted)">=</div><div style="text-align:center;padding:4px 12px;background:${_availProfitAll>=0?'rgba(99,102,241,0.1)':'rgba(239,68,68,0.1)'};border-radius:6px;border:1.5px solid ${_availProfitAll>=0?'var(--primary)':'var(--danger)'}"><div style="font-size:8px;color:${_availProfitAll>=0?'var(--primary)':'var(--danger)'};font-weight:600">LN khả dụng 可用利潤</div><div style="font-weight:800;font-size:14px;color:${_availProfitAll>=0?'var(--primary)':'var(--danger)'}">${fmt(_availProfitAll)}</div></div></div></div>`:''}`;
         // Alert
         if(yearData.length>=2){const l=yearData[yearData.length-1],p=yearData[yearData.length-2];const lM=l.rev>0?(l.profit/l.rev*100).toFixed(1):'0',pM=p.rev>0?(p.profit/p.rev*100).toFixed(1):'0';
         document.getElementById('profitAlertBox').innerHTML=`<div class="card" style="padding:10px;border-left:4px solid var(--primary)"><div style="font-weight:700;font-size:12px;margin-bottom:4px">📊 So sánh biên lợi nhuận <span style="color:var(--text-muted);font-weight:400;font-size:10px">利潤率對比</span></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div style="padding:8px;background:var(--bg-secondary);border-radius:6px;text-align:center"><div style="font-size:9px;color:var(--text-muted)">Biên LN ${p.y} 利潤率</div><div style="font-weight:700;font-size:12px">${pM}%</div></div><div style="padding:8px;background:var(--bg-secondary);border-radius:6px;text-align:center"><div style="font-size:9px;color:var(--text-muted)">Biên LN ${l.y} 利潤率</div><div style="font-weight:700;font-size:12px">${lM}%</div></div><div style="padding:8px;background:${parseFloat(lM)>=parseFloat(pM)?'rgba(34,197,94,0.06)':'rgba(239,68,68,0.06)'};border-radius:6px;text-align:center;border:1.5px solid ${parseFloat(lM)>=parseFloat(pM)?'var(--success)':'var(--danger)'}"><div style="font-size:9px;color:var(--text-muted)">Thay đổi 變化</div><div style="font-weight:800;font-size:12px;color:${parseFloat(lM)>=parseFloat(pM)?'var(--success)':'var(--danger)'}">${(parseFloat(lM)-parseFloat(pM)).toFixed(1)}%</div></div></div></div>`}
@@ -4460,6 +4463,9 @@ function renderProfitStats(){
         const growth=prevProfit!==0?((mData.profit-prevProfit)/Math.abs(prevProfit)*100):0;
         const growthStr=prevProfit!==0?(growth>=0?'+':'')+growth.toFixed(1)+'%':'—';
         const cumul=getCumulativeProfit(y,selM);
+        const _dvLocks=getDividendLocks().filter(l=>l.status==='paid');
+        const _totalDivPaid=_dvLocks.reduce((s,l)=>s+(l.paidTotal||0),0);
+        const _availProfit=cumul.profit-_totalDivPaid;
         document.getElementById('profitStatsCards').innerHTML=`
         <div style="padding:12px 14px;background:linear-gradient(135deg,rgba(99,102,241,0.05),rgba(34,197,94,0.05));border-radius:10px;border:1.5px solid var(--border);margin-bottom:8px">
             <div style="font-weight:700;font-size:12px;margin-bottom:8px">📊 Lợi nhuận lũy kế 累計利潤 <span style="font-size:10px;color:var(--text-muted);font-weight:400">(từ 2025 đến T${selM}/${y})</span></div>
@@ -4475,6 +4481,17 @@ function renderProfitStats(){
                     <div style="font-size:9px;color:var(--text-muted);margin-top:2px">Biên 利潤率: ${cumul.margin}%</div>
                 </div>
             </div>
+            ${_totalDivPaid>0?`<div style="margin-top:8px;padding:10px 12px;background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(99,102,241,0.06));border-radius:8px;border:1.5px solid rgba(245,158,11,0.3)">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                        <div style="text-align:center"><div style="font-size:8px;color:var(--text-muted)">LN gốc 原始利潤</div><div style="font-weight:700;font-size:12px">${fmt(cumul.profit)}</div></div>
+                        <div style="font-size:16px;color:var(--text-muted)">−</div>
+                        <div style="text-align:center"><div style="font-size:8px;color:#f59e0b;font-weight:600">LT đã chi 已付分紅</div><div style="font-weight:700;font-size:12px;color:#f59e0b">${fmt(_totalDivPaid)}</div><div style="font-size:8px;color:var(--text-muted)">${_dvLocks.length} lần chi</div></div>
+                        <div style="font-size:16px;color:var(--text-muted)">=</div>
+                        <div style="text-align:center;padding:4px 12px;background:${_availProfit>=0?'rgba(99,102,241,0.1)':'rgba(239,68,68,0.1)'};border-radius:6px;border:1.5px solid ${_availProfit>=0?'var(--primary)':'var(--danger)'}"><div style="font-size:8px;color:${_availProfit>=0?'var(--primary)':'var(--danger)'};font-weight:600">LN khả dụng 可用利潤</div><div style="font-weight:800;font-size:14px;color:${_availProfit>=0?'var(--primary)':'var(--danger)'}">${fmt(_availProfit)}</div></div>
+                    </div>
+                </div>
+            </div>`:''}
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
             <div style="text-align:center;padding:10px;background:#fff;border-radius:8px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--text-muted)">DT T${selM} 營業額</div><div style="font-weight:800;color:var(--success);font-size:13px">${fmt(mData.tRev)}</div></div>
@@ -4522,6 +4539,9 @@ function renderProfitStats(){
         const totalProfit=totalRev-totalExp;
         const margin=totalRev>0?(totalProfit/totalRev*100).toFixed(1):'0';
         const cumulFY=getCumulativeProfit(y,12);
+        const _dvLocksFY=getDividendLocks().filter(l=>l.status==='paid');
+        const _totalDivPaidFY=_dvLocksFY.reduce((s,l)=>s+(l.paidTotal||0),0);
+        const _availProfitFY=cumulFY.profit-_totalDivPaidFY;
         document.getElementById('profitStatsCards').innerHTML=`
         <div style="padding:12px 14px;background:linear-gradient(135deg,rgba(99,102,241,0.05),rgba(34,197,94,0.05));border-radius:10px;border:1.5px solid var(--border);margin-bottom:8px">
             <div style="font-weight:700;font-size:12px;margin-bottom:8px">📊 Lợi nhuận lũy kế 累計利潤 <span style="font-size:10px;color:var(--text-muted);font-weight:400">(từ 2025 đến hết ${y})</span></div>
@@ -4537,6 +4557,17 @@ function renderProfitStats(){
                     <div style="font-size:9px;color:var(--text-muted);margin-top:2px">Biên 利潤率: ${cumulFY.margin}%</div>
                 </div>
             </div>
+            ${_totalDivPaidFY>0?`<div style="margin-top:8px;padding:10px 12px;background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(99,102,241,0.06));border-radius:8px;border:1.5px solid rgba(245,158,11,0.3)">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                        <div style="text-align:center"><div style="font-size:8px;color:var(--text-muted)">LN gốc 原始利潤</div><div style="font-weight:700;font-size:12px">${fmt(cumulFY.profit)}</div></div>
+                        <div style="font-size:16px;color:var(--text-muted)">−</div>
+                        <div style="text-align:center"><div style="font-size:8px;color:#f59e0b;font-weight:600">LT đã chi 已付分紅</div><div style="font-weight:700;font-size:12px;color:#f59e0b">${fmt(_totalDivPaidFY)}</div><div style="font-size:8px;color:var(--text-muted)">${_dvLocksFY.length} lần chi</div></div>
+                        <div style="font-size:16px;color:var(--text-muted)">=</div>
+                        <div style="text-align:center;padding:4px 12px;background:${_availProfitFY>=0?'rgba(99,102,241,0.1)':'rgba(239,68,68,0.1)'};border-radius:6px;border:1.5px solid ${_availProfitFY>=0?'var(--primary)':'var(--danger)'}"><div style="font-size:8px;color:${_availProfitFY>=0?'var(--primary)':'var(--danger)'};font-weight:600">LN khả dụng 可用利潤</div><div style="font-weight:800;font-size:14px;color:${_availProfitFY>=0?'var(--primary)':'var(--danger)'}">${fmt(_availProfitFY)}</div></div>
+                    </div>
+                </div>
+            </div>`:''}
         </div>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
             <div style="text-align:center;padding:10px;background:#fff;border-radius:8px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--text-muted)">Tổng DT ${y} 營業額</div><div style="font-weight:800;color:var(--success);font-size:13px">${fmt(totalRev)}</div></div>
