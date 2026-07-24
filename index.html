@@ -402,6 +402,12 @@
                     <select id="exp-filter-suspect" onchange="debouncedRenderExp()" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:#f59e0b;font-weight:600">
                         <option value="">Nghi vấn</option><option value="yes">⚠️ Nghi vấn</option><option value="no">Bình thường</option>
                     </select>
+                    <select id="exp-filter-advance" onchange="debouncedRenderExp()" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--purple);font-weight:600">
+                        <option value="">Tạm ứng 請款</option><option value="has">Có tạm ứng</option><option value="none">Không tạm ứng</option><option value="unreturned">Chưa hoàn ứng</option><option value="returned">Đã hoàn ứng</option>
+                    </select>
+                    <select id="exp-filter-advperson" onchange="debouncedRenderExp()" style="padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">
+                        <option value="">Người tạm ứng 請款人</option>
+                    </select>
                     <button class="btn btn-ghost btn-xs" onclick="clearExpFilters()" style="margin-left:auto;font-size:11px">Xóa bộ lọc 清除篩選</button>
                 </div>
 
@@ -414,6 +420,7 @@
                     <select id="batch-new-category" style="padding:5px 8px;border:1px solid var(--primary);border-radius:6px;font-size:12px;font-family:inherit" onchange="if(this.value)confirmBatchCategory()">
                         <option value="">Đổi phân loại...</option>
                     </select>
+                    <button class="btn btn-sm" onclick="batchMarkAdvanceReturned()" style="background:var(--purple);color:#fff">Hoàn ứng</button>
                     <button class="btn btn-sm btn-danger" onclick="batchDelete()">Xóa</button>
                     <button class="btn btn-sm btn-outline" onclick="batchDeselectAll()">Bỏ chọn</button>
                 </div>
@@ -736,7 +743,7 @@
                 <div class="form-group"><label>GHI CHÚ 備註</label><textarea id="ho-note" rows="2" placeholder="Ghi chú khi nhận ca..." style="font-size:12px"></textarea></div>
                 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
                     <button class="btn btn-primary" onclick="saveHandover()">✅ Xác nhận nhận ca 確認接班</button>
-                    <button class="btn" style="background:var(--purple);color:#fff;font-weight:700" onclick="doSaveHandover('end')">🌙 Kết ca 結班</button>
+                    <button class="btn" id="btnEndShift" style="background:var(--purple);color:#fff;font-weight:700;display:none" onclick="confirmEndShift()">🌙 Kết ca 結班</button>
                 </div>
             </div>
 
@@ -827,7 +834,15 @@
             <div class="filter-bar" style="gap:8px;flex-wrap:wrap">
                 <select id="stat-exp-year" onchange="renderExpenseStats()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="all">Tất cả 全部</option><option value="2026" selected>2026</option><option value="2025">2025</option></select>
                 <select id="stat-exp-month" onchange="renderExpenseStats()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="0">Cả năm 全年</option><option value="1">T1</option><option value="2">T2</option><option value="3">T3</option><option value="4">T4</option><option value="5">T5</option><option value="6">T6</option><option value="7">T7</option><option value="8">T8</option><option value="9">T9</option><option value="10">T10</option><option value="11">T11</option><option value="12">T12</option></select>
+                <button onclick="toggleMultiMonthSelect('exp')" style="padding:5px 12px;border-radius:8px;border:1.5px solid var(--primary);background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:600;cursor:pointer">📊 So sánh nhiều tháng</button>
+                <button onclick="downloadStatsPDF('exp')" style="padding:5px 12px;border-radius:8px;border:1.5px solid var(--success);background:rgba(34,197,94,0.06);color:var(--success);font-size:11px;font-weight:600;cursor:pointer">📄 Tải báo cáo</button>
             </div>
+            <div id="exp-multi-month-bar" style="display:none;padding:10px 14px;background:rgba(99,102,241,0.04);border-radius:10px;border:1.5px solid rgba(99,102,241,0.15);margin-bottom:12px">
+                <div style="font-size:11px;font-weight:700;margin-bottom:6px">Chọn tháng so sánh:</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px" id="exp-multi-month-checks"></div>
+                <button onclick="renderMultiMonthCompare('exp')" style="margin-top:8px;padding:6px 18px;border-radius:16px;border:none;background:var(--primary);color:#fff;font-weight:700;font-size:11px;cursor:pointer">So sánh</button>
+            </div>
+            <div id="exp-multi-month-result" style="display:none"></div>
             <div id="expenseStatsGrid" style="margin-bottom:12px"></div>
             <div id="expAlertBox" style="margin-bottom:12px"></div>
             <div class="card" style="padding:10px"><canvas id="expChartCanvas" height="180"></canvas></div>
@@ -847,7 +862,15 @@
             <div class="filter-bar" style="gap:8px;flex-wrap:wrap">
                 <select id="stat-rev-year" onchange="renderRevenueStats()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="all">Tất cả 全部</option><option value="2026" selected>2026</option><option value="2025">2025</option></select>
                 <select id="stat-rev-month" onchange="renderRevenueStats()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="0">Cả năm 全年</option><option value="1">T1</option><option value="2">T2</option><option value="3">T3</option><option value="4">T4</option><option value="5">T5</option><option value="6">T6</option><option value="7">T7</option><option value="8">T8</option><option value="9">T9</option><option value="10">T10</option><option value="11">T11</option><option value="12">T12</option></select>
+                <button onclick="toggleMultiMonthSelect('rev')" style="padding:5px 12px;border-radius:8px;border:1.5px solid var(--primary);background:var(--primary-light);color:var(--primary);font-size:11px;font-weight:600;cursor:pointer">📊 So sánh nhiều tháng</button>
+                <button onclick="downloadStatsPDF('rev')" style="padding:5px 12px;border-radius:8px;border:1.5px solid var(--success);background:rgba(34,197,94,0.06);color:var(--success);font-size:11px;font-weight:600;cursor:pointer">📄 Tải báo cáo</button>
             </div>
+            <div id="rev-multi-month-bar" style="display:none;padding:10px 14px;background:rgba(99,102,241,0.04);border-radius:10px;border:1.5px solid rgba(99,102,241,0.15);margin-bottom:12px">
+                <div style="font-size:11px;font-weight:700;margin-bottom:6px">Chọn tháng so sánh:</div>
+                <div style="display:flex;flex-wrap:wrap;gap:4px" id="rev-multi-month-checks"></div>
+                <button onclick="renderMultiMonthCompare('rev')" style="margin-top:8px;padding:6px 18px;border-radius:16px;border:none;background:var(--primary);color:#fff;font-weight:700;font-size:11px;cursor:pointer">So sánh</button>
+            </div>
+            <div id="rev-multi-month-result" style="display:none"></div>
             <div id="revenueStatsGrid" style="margin-bottom:12px"></div>
             <div id="revAlertBox" style="margin-bottom:12px"></div>
             <div class="card" style="padding:10px"><canvas id="revChartCanvas" height="180"></canvas></div>
@@ -863,6 +886,7 @@
             <div class="filter-bar" style="gap:8px;flex-wrap:wrap">
                 <select id="profit-year" onchange="renderProfitStats()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="all">Tất cả 全部</option><option value="2026" selected>2026</option><option value="2025">2025</option></select>
                 <select id="profit-month" onchange="renderProfitStats()" style="padding:6px 8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"><option value="0">Cả năm 全年</option><option value="1">T1</option><option value="2">T2</option><option value="3">T3</option><option value="4">T4</option><option value="5">T5</option><option value="6">T6</option><option value="7">T7</option><option value="8">T8</option><option value="9">T9</option><option value="10">T10</option><option value="11">T11</option><option value="12">T12</option></select>
+                <button onclick="downloadStatsPDF('profit')" style="padding:5px 12px;border-radius:8px;border:1.5px solid var(--success);background:rgba(34,197,94,0.06);color:var(--success);font-size:11px;font-weight:600;cursor:pointer">📄 Tải báo cáo</button>
             </div>
             <div id="profitStatsCards" style="margin-bottom:12px"></div>
             <div id="profitAlertBox" style="margin-bottom:12px"></div>
@@ -870,6 +894,14 @@
             <div class="card" style="padding:0;overflow:hidden">
                 <div style="padding:10px 14px;font-weight:700;font-size:13px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1" id="profitCompareTitle">So sánh lợi nhuận theo tháng <span style="font-size:11px;font-weight:400;color:var(--text-muted)">每月利潤比較</span></div>
                 <div id="profitMonthTable" style="overflow-x:auto"></div>
+            </div>
+            <div id="profitDayTableCard" class="card" style="padding:0;overflow:hidden;display:none">
+                <div style="padding:10px 14px;font-weight:700;font-size:13px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1">📅 Chi tiết theo ngày <span style="font-size:11px;font-weight:400;color:var(--text-muted)">每日明細</span></div>
+                <div id="profitDayTable" style="overflow-x:auto;max-height:500px;overflow-y:auto"></div>
+            </div>
+            <div id="profitSamePeriodCard" class="card" style="padding:0;overflow:hidden">
+                <div style="padding:10px 14px;font-weight:700;font-size:13px;border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:1">📊 So sánh cùng kỳ <span style="font-size:11px;font-weight:400;color:var(--text-muted)">同期比較</span></div>
+                <div id="profitSamePeriodTable" style="overflow-x:auto"></div>
             </div>
         </div>
 
@@ -1037,6 +1069,7 @@
 
             <!-- TAB: TỔNG QUAN 總覽 -->
             <div id="loituc-tab-tongquan" style="display:none">
+                <div id="tongquan-sub-tabs" style="display:flex;gap:0;margin-bottom:14px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)"></div>
                 <div id="loitucOverviewContent"></div>
             </div>
 
@@ -1294,7 +1327,7 @@
             <div class="form-group"><label>Ca 班次</label><select id="edit-shift"><option value="1">Ca 1</option><option value="2">Ca 2</option></select></div>
         </div>
         <div class="form-row">
-            <div class="form-group"><label>Phân loại 分類</label><select id="edit-category" style="width:100%"></select></div>
+            <div class="form-group"><label>Phân loại 分類</label><div class="search-select" id="edit-catsel"><input type="text" readonly placeholder="Chọn phân loại..." onclick="openSearchSelect('edit-catsel','category')" id="edit-category-search" data-value="" style="width:100%"><div class="dropdown" id="edit-catdd"></div></div></div>
             <div class="form-group"><label>Số tiền 金額</label><input type="number" id="edit-amount"></div>
         </div>
         <div class="form-row">
@@ -1309,6 +1342,7 @@
         <div class="form-row">
             <div class="form-group"><label>Người tạm ứng 請款人</label><input type="text" id="edit-advanceName"></div>
             <div class="form-group"><label>Số tiền tạm ứng 請款金額</label><input type="number" id="edit-advanceAmount"></div>
+            <div class="form-group"><label>Hoàn ứng 還款狀態</label><select id="edit-advanceReturned"><option value="">Chưa hoàn</option><option value="yes">Đã hoàn ứng ✅</option></select></div>
         </div>
         <div class="form-row" id="edit-deposit-row" style="display:none">
             <div class="form-group"><label>Số tiền đã cọc 訂金</label><input type="number" id="edit-depositAmount"></div>
@@ -1565,6 +1599,20 @@ function isUserEditing(){
     var ae=document.activeElement;
     if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'||ae.tagName==='SELECT'))return true;
     if(document.querySelector('.modal-overlay.open'))return true;
+    // Check if expense form has unsaved data
+    var expItems=document.querySelectorAll('.expense-item-card');
+    if(expItems.length>0){
+        for(var i=0;i<expItems.length;i++){
+            var inputs=expItems[i].querySelectorAll('input,textarea,select');
+            for(var j=0;j<inputs.length;j++){
+                var inp=inputs[j];
+                if(inp.type==='text'&&inp.value&&inp.value.trim()&&!inp.readOnly)return true;
+                if(inp.tagName==='TEXTAREA'&&inp.value&&inp.value.trim())return true;
+            }
+        }
+    }
+    // Check if bank expense form is open
+    if(document.querySelector('[id^="bankExpForm-"]'))return true;
     return false;
 }
 // Pending re-render flag: when auto-refresh is skipped due to editing, queue it
@@ -1875,7 +1923,7 @@ function updateTodayCount(){
 }
 function clearExpFilters(){
     ['exp-filter-from','exp-filter-to'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
-    ['exp-filter-status','exp-filter-category','exp-filter-user','exp-filter-invoice','exp-filter-vat','exp-filter-paymethod','exp-filter-quick','exp-filter-supplier','exp-filter-suspect'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+    ['exp-filter-status','exp-filter-category','exp-filter-user','exp-filter-invoice','exp-filter-vat','exp-filter-paymethod','exp-filter-quick','exp-filter-supplier','exp-filter-suspect','exp-filter-advance','exp-filter-advperson'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
     renderExpenseSummary();
 }
 function applyQuickDateFilter(){
@@ -2234,6 +2282,9 @@ function populateFilterDropdowns(){
     const userSel=document.getElementById('exp-filter-user');
     catSel.innerHTML='<option value="">Tất cả phân loại</option>'+cats.map(c=>`<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
     userSel.innerHTML='<option value="">Tất cả người nhập</option>'+users.map(u=>`<option value="${escHtml(u)}">${escHtml(u)}</option>`).join('');
+    const advPersons=[...new Set(expenses.map(e=>e.advanceName).filter(Boolean))];
+    const advSel=document.getElementById('exp-filter-advperson');
+    if(advSel)advSel.innerHTML='<option value="">Người tạm ứng 請款人</option>'+advPersons.map(p=>`<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
 }
 
 var _expRenderTimer=null;
@@ -2256,6 +2307,8 @@ function renderExpenseSummary(){
     var fPay=document.getElementById('exp-filter-paymethod')?.value||'';
     var fSupplier=document.getElementById('exp-filter-supplier')?.value||'';
     var fSuspect=document.getElementById('exp-filter-suspect')?.value||'';
+    var fAdvance=document.getElementById('exp-filter-advance')?.value||'';
+    var fAdvPerson=document.getElementById('exp-filter-advperson')?.value||'';
     // Single-pass filter (faster than chaining .filter)
     var data=[];
     for(var fi=0;fi<allData.length;fi++){
@@ -2273,6 +2326,11 @@ function renderExpenseSummary(){
         if(fVat==='no'&&e.vat)continue;
         if(fSuspect==='yes'&&!e.suspect)continue;
         if(fSuspect==='no'&&e.suspect)continue;
+        if(fAdvance==='has'&&!e.advanceName)continue;
+        if(fAdvance==='none'&&e.advanceName)continue;
+        if(fAdvance==='unreturned'&&(!e.advanceName||e.advanceReturned))continue;
+        if(fAdvance==='returned'&&(!e.advanceName||!e.advanceReturned))continue;
+        if(fAdvPerson&&(e.advanceName||'')!==fAdvPerson)continue;
         data.push(e);
     }
     data.sort(function(a,b){var c=b.date.localeCompare(a.date);return c!==0?c:(b.createdAt||'').localeCompare(a.createdAt||'')});
@@ -2299,7 +2357,7 @@ function renderExpenseSummary(){
         var rowClass=confirmed?'confirmed-row':'';
         if(e.suspect)rowClass+=(rowClass?' ':'')+'suspect-row';
         var advNote='';
-        if(e.advanceName)advNote='<div style="font-size:11px;color:var(--purple);margin-top:2px">↳ Tạm ứng: '+escHtml(e.advanceName)+' - '+fmtNum(e.advanceAmount)+' ₫</div>';
+        if(e.advanceName){var advReturnedMark=e.advanceReturned?'<span style="background:#dcfce7;color:#16a34a;font-size:9px;padding:1px 5px;border-radius:3px;margin-left:4px">✅ Đã hoàn ứng</span>':'<button class="btn-xs" onclick="event.stopPropagation();markAdvanceReturned(\''+e.id+'\')" style="font-size:9px;padding:1px 5px;background:var(--purple);color:#fff;border-radius:3px;border:none;cursor:pointer;margin-left:4px" title="Đánh dấu đã hoàn ứng 標記已還款">Hoàn ứng</button>';advNote='<div style="font-size:11px;color:var(--purple);margin-top:2px">↳ Tạm ứng: '+escHtml(e.advanceName)+' - '+fmtNum(e.advanceAmount)+' ₫'+advReturnedMark+'</div>';}
         if(e.status==='deposit'&&e.depositAmount)advNote+='<div style="font-size:11px;color:#92400e;margin-top:2px">↳ Đã cọc: '+fmtNum(e.depositAmount)+' ₫</div>';
         var zhLine=e.detailZh?'<div style="font-size:11px;color:var(--text-muted)">'+escHtml(e.detailZh)+'</div>':'';
         var payMethodText=e.payMethod==='transfer'?'CK 轉帳'+getReconcileMark('expck',e.date):e.payMethod==='credit'?'CN 賒帳':'TM 現金';
@@ -2354,7 +2412,7 @@ function editExpense(id){
     document.getElementById('edit-date').value=e.date||'';
     document.getElementById('edit-time').value=e.timeStr||'';
     document.getElementById('edit-shift').value=e.shift||'1';
-    document.getElementById('edit-category').innerHTML=cats.map(c=>`<option value="${escHtml(c)}" ${c===e.category?'selected':''}>${escHtml(c)}</option>`).join('');
+    var ecInp=document.getElementById('edit-category-search');if(ecInp){ecInp.value=e.category||'';ecInp.dataset.value=e.category||'';}
     document.getElementById('edit-supplier').innerHTML='<option value="">-- Chọn NCC --</option>'+sups.map(s=>`<option value="${escHtml(s)}" ${s===e.supplier?'selected':''}>${escHtml(s)}</option>`).join('');
     document.getElementById('edit-amount').value=e.amount;
     document.getElementById('edit-detail').value=e.detailVi||'';
@@ -2362,6 +2420,8 @@ function editExpense(id){
     document.getElementById('edit-status').value=e.status||'paid';
     document.getElementById('edit-payMethod').value=e.payMethod||'cash';
     document.getElementById('edit-advanceName').value=e.advanceName||'';
+    var advRetSel=document.getElementById('edit-advanceReturned');if(advRetSel)advRetSel.value=e.advanceReturned?'yes':'';
+    var advRetSel=document.getElementById('edit-advanceReturned');if(advRetSel)advRetSel.value=e.advanceReturned?'yes':'';
     document.getElementById('edit-advanceAmount').value=e.advanceAmount||0;
     document.getElementById('edit-depositAmount').value=e.depositAmount||0;
     document.getElementById('edit-invoice').checked=!!e.invoice;
@@ -2381,7 +2441,7 @@ function confirmEditExpense(){
         e.date=document.getElementById('edit-date').value||e.date;
         e.timeStr=document.getElementById('edit-time').value||e.timeStr;
         e.shift=document.getElementById('edit-shift').value||e.shift;
-        e.category=document.getElementById('edit-category').value;
+        e.category=(document.getElementById('edit-category-search')||{}).dataset?.value||'';
         e.amount=Number(document.getElementById('edit-amount').value)||0;
         e.detailVi=document.getElementById('edit-detail').value;
         e.detailZh=document.getElementById('edit-detailZh').value;
@@ -2389,6 +2449,7 @@ function confirmEditExpense(){
         e.payMethod=document.getElementById('edit-payMethod').value;
         e.supplier=document.getElementById('edit-supplier').value;
         e.advanceName=document.getElementById('edit-advanceName').value;
+        var advRetVal=document.getElementById('edit-advanceReturned');if(advRetVal){e.advanceReturned=advRetVal.value==='yes';if(e.advanceReturned&&!e.advanceReturnedAt){e.advanceReturnedAt=new Date().toISOString();e.advanceReturnedBy=currentUser?currentUser.displayName:''}}
         e.advanceAmount=Number(document.getElementById('edit-advanceAmount').value)||0;
         e.depositAmount=e.status==='deposit'?Number(document.getElementById('edit-depositAmount').value)||0:0;
         e.invoice=document.getElementById('edit-invoice').checked;
@@ -2453,6 +2514,35 @@ function batchDeselectAll(){
 function populateBatchCategoryDropdown(){
     const cats=getCategories();
     document.getElementById('batch-new-category').innerHTML='<option value="">Đổi phân loại...</option>'+cats.map(c=>`<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+}
+function markAdvanceReturned(id){
+    var exps=gs(SK.expenses)||[];
+    var e=exps.find(x=>String(x.id)===String(id));
+    if(!e||!e.advanceName){showToast('Không có tạm ứng!','error');return}
+    if(e.advanceReturned){showToast('Đã hoàn ứng rồi!');return}
+    e.advanceReturned=true;e.advanceReturnedAt=new Date().toISOString();
+    e.advanceReturnedBy=currentUser?currentUser.displayName:'';
+    ss(SK.expenses,exps);syncUpdateToSheet('expense',[e]);
+    showToast('✅ Đã đánh dấu hoàn ứng cho '+e.advanceName);
+    renderExpenseSummary();
+}
+function batchMarkAdvanceReturned(){
+    var checks=document.querySelectorAll('.exp-check:checked');
+    if(!checks.length){showToast('Chưa chọn khoản nào!');return}
+    var ids=[];checks.forEach(function(c){ids.push(c.dataset.id)});
+    var exps=gs(SK.expenses)||[];
+    var count=0;var updated=[];
+    exps.forEach(function(e){
+        if(ids.includes(String(e.id))&&e.advanceName&&!e.advanceReturned){
+            e.advanceReturned=true;e.advanceReturnedAt=new Date().toISOString();
+            e.advanceReturnedBy=currentUser?currentUser.displayName:'';
+            count++;updated.push(e);
+        }
+    });
+    if(count===0){showToast('Không có khoản tạm ứng nào cần hoàn!','error');return}
+    ss(SK.expenses,exps);if(updated.length)syncUpdateToSheet('expense',updated);
+    showToast('✅ Đã hoàn ứng '+count+' khoản');
+    renderExpenseSummary();
 }
 function batchDelete(){
     const ids=getCheckedIds();
@@ -3218,6 +3308,8 @@ function initShiftPage(){
         // Ca 2/3 → chỉ cho nhận BG, disable tab mở ca
         shiftMode='handover';
         document.getElementById('ho-shift-type').value=String(info.nextShift);
+        var btnEnd=document.getElementById('btnEndShift');
+        if(btnEnd){btnEnd.style.display=(currentUser?.role==='boss'||info.nextShift>=2)?'':'none'}
         document.getElementById('ho-shift-type').disabled=true;
         document.getElementById('ho-from').value=info.fromPerson;
         document.getElementById('ho-from').readOnly=true;
@@ -3444,6 +3536,10 @@ function calcHandoverDiff(){
     }
 }
 // Ca 2/3: Nhận bàn giao
+function confirmEndShift(){
+    if(!confirm('⚠️ Bạn có chắc muốn KẾT CA cho ngày hôm nay?\n\n確認結束今日所有班次？\n\nSau khi kết ca sẽ không thể mở thêm ca mới (trừ boss hồi phục).'))return;
+    doSaveHandover('end');
+}
 function saveHandover(){
     doSaveHandover('normal');
 }
@@ -4272,7 +4368,7 @@ function editExpenseFromStat(id,cat,month,year){
     if(e.confirmed&&currentUser.role!=='boss'){alert('Chi tiêu đã được xác nhận, không thể chỉnh sửa 已確認無法編輯');return}
     const cats=getCategories();
     const sups=getSuppliers();
-    document.getElementById('edit-category').innerHTML=cats.map(c=>`<option value="${escHtml(c)}" ${c===e.category?'selected':''}>${escHtml(c)}</option>`).join('');
+    var ecInp=document.getElementById('edit-category-search');if(ecInp){ecInp.value=e.category||'';ecInp.dataset.value=e.category||'';}
     document.getElementById('edit-supplier').innerHTML='<option value="">-- Chọn NCC 選供應商 --</option>'+sups.map(s=>`<option value="${escHtml(s)}" ${s===e.supplier?'selected':''}>${escHtml(s)}</option>`).join('');
     document.getElementById('edit-amount').value=e.amount;
     document.getElementById('edit-detail').value=e.detailVi||'';
@@ -4449,6 +4545,7 @@ function renderProfitStats(){
         const canvas=document.getElementById('profitChartCanvas');
         drawBarChart(canvas,years.map(String),[{label:'DT 營業額',data:yearData.map(d=>d.rev),color:'#22c55e'},{label:'CT 支出',data:yearData.map(d=>d.exp),color:'#ef4444'},{label:'LN 利潤',data:yearData.map(d=>d.profit),color:'#6366f1'}],'Lợi nhuận các năm 各年度利潤');
         document.getElementById('profitCompareTitle').innerHTML=`So sánh lợi nhuận các năm <span style="font-size:11px;font-weight:400;color:var(--text-muted)">各年度利潤對比</span>`;
+        document.getElementById('profitDayTableCard').style.display='none';renderSamePeriodComparison(new Date().getFullYear(),new Date().getMonth()+1);
         let tbl=`<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 6px;text-align:left">Năm 年份</th><th style="padding:5px;text-align:right">Doanh thu 營業額</th><th style="padding:5px;text-align:right">Chi tiêu 支出</th><th style="padding:5px;text-align:right;font-weight:700">Lợi nhuận 利潤</th><th style="padding:5px;text-align:right">Biên LN 利潤率</th></tr></thead><tbody>`;
         yearData.forEach(d=>{const m=d.rev>0?(d.profit/d.rev*100).toFixed(1):'0';tbl+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 6px;font-weight:700">${d.y}</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(d.rev)}</td><td style="padding:5px;text-align:right;color:var(--danger)">${fmtNum(d.exp)}</td><td style="padding:5px;text-align:right;font-weight:700;color:${d.profit>=0?'var(--success)':'var(--danger)'}">${fmtNum(d.profit)}</td><td style="padding:5px;text-align:right">${m}%</td></tr>`});
         tbl+=`<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--primary)"><td style="padding:5px 6px">TỔNG 合計</td><td style="padding:5px;text-align:right;color:var(--success)">${fmtNum(tRev)}</td><td style="padding:5px;text-align:right;color:var(--danger)">${fmtNum(tExp)}</td><td style="padding:5px;text-align:right;color:${tProfit>=0?'var(--success)':'var(--danger)'}">${fmtNum(tProfit)}</td><td style="padding:5px;text-align:right">${tRev>0?(tProfit/tRev*100).toFixed(1):'0'}%</td></tr></tbody></table>`;
@@ -4532,6 +4629,7 @@ function renderProfitStats(){
         drawBarChart(canvas,prevLabels,[{label:'DT 營業額',data:revData,color:'#22c55e'},{label:'CT 支出',data:expData,color:'#ef4444'},{label:'LN 利潤',data:profData,color:'#6366f1'}],'T'+selM+'/'+y+' vs tháng trước 環比對比');
         // Comparison table: this month vs prev + avg
         document.getElementById('profitCompareTitle').innerHTML=`Chi tiết lợi nhuận T${selM}/${y} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">第${selM}月利潤明細</span>`;
+        renderProfitDayTable(y,selM);renderSamePeriodComparison(y,selM);
         let tbl=`<table style="width:100%;font-size:11px;border-collapse:collapse">
             <tr style="border-bottom:1px solid #eee"><td style="padding:6px;font-weight:600">Doanh thu 營業額 <span style="font-size:9px;color:var(--text-muted)">(trừ tip)</span></td><td style="text-align:right;padding:6px;color:var(--success);font-weight:700">${fmt(mData.tRev)}</td><td style="text-align:right;padding:6px;color:var(--text-muted);font-size:10px">${prevM?'T'+(selM-1)+': '+fmtNum(prevM.tRev):'—'}</td></tr>
             <tr style="border-bottom:1px solid #eee"><td style="padding:6px;font-weight:600">(−) Chi tiêu 支出</td><td style="text-align:right;padding:6px;color:var(--danger);font-weight:700">${fmt(mData.tExp)}</td><td style="text-align:right;padding:6px;color:var(--text-muted);font-size:10px">${prevM?'T'+(selM-1)+': '+fmtNum(prevM.tExp):'—'}</td></tr>
@@ -4614,6 +4712,7 @@ function renderProfitStats(){
         ],'DT — CT — LN '+y+' 營業額—支出—利潤');
         // Monthly table
         document.getElementById('profitCompareTitle').innerHTML=`So sánh lợi nhuận theo tháng <span style="font-size:11px;font-weight:400;color:var(--text-muted)">每月利潤比較</span>`;
+        var curMonth=new Date().getMonth()+1;renderProfitDayTable(Number(yVal),curMonth);renderSamePeriodComparison(Number(yVal),0);
         let tbl=`<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 6px;text-align:left">Tháng 月份</th><th style="padding:5px;text-align:right">DT 營業額</th><th style="padding:5px;text-align:right">CT 支出</th><th style="padding:5px;text-align:right;font-weight:700">LN 利潤</th><th style="padding:5px;text-align:right">Biên 利潤率</th><th style="padding:5px;text-align:right">Tăng trưởng 增長</th></tr></thead><tbody>`;
         let prevP=0;
         md.forEach(m=>{
@@ -5572,6 +5671,124 @@ function renderLoitucOverview(){
     }
 
     document.getElementById('loitucOverviewContent').innerHTML=html;
+
+    // Build sub-tabs
+    var tabsHtml='<div onclick="showTongquanSub(\'all\')" class="tq-sub active" style="flex:1;padding:8px 12px;text-align:center;cursor:pointer;font-size:11px;font-weight:700;background:var(--primary);color:#fff;transition:all .2s">Tổng quan</div>';
+    shs.forEach(function(sh){
+        tabsHtml+='<div onclick="showTongquanSub(\''+sh.id+'\')" class="tq-sub" style="flex:1;padding:8px 12px;text-align:center;cursor:pointer;font-size:11px;font-weight:600;background:var(--bg-secondary);color:var(--text-secondary);border-left:1px solid var(--border);transition:all .2s">'+sh.name+'</div>';
+    });
+    document.getElementById('tongquan-sub-tabs').innerHTML=tabsHtml;
+}
+
+function showTongquanSub(id){
+    // Update tab styles
+    document.querySelectorAll('#tongquan-sub-tabs .tq-sub').forEach(function(el){
+        var isActive=(id==='all'&&el.textContent==='Tổng quan')||el.getAttribute('onclick').indexOf(id)>-1;
+        el.style.background=isActive?'var(--primary)':'var(--bg-secondary)';
+        el.style.color=isActive?'#fff':'var(--text-secondary)';
+    });
+    if(id==='all'){renderLoitucOverview();return}
+    renderShareholderDetail(id);
+}
+
+function renderShareholderDetail(shId){
+    var shs=gs(SK.shareholders)||[];
+    var sh=shs.find(function(s){return s.id===shId});
+    if(!sh) return;
+    var locks=getDividendLocks();
+    var entries=(gs(SK.benefitEntries)||[]).filter(function(e){return e.shareholderId===shId&&e.amount>0});
+    var isW=sh.type==='working';
+    var html='';
+
+    // === Header card ===
+    html+='<div class="card" style="padding:16px;border-left:4px solid '+(isW?'var(--success)':'var(--primary)')+'">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">';
+    html+='<div style="display:flex;align-items:center;gap:10px"><span style="font-size:28px">'+(isW?'👤':'💼')+'</span>';
+    html+='<div><div style="font-size:18px;font-weight:800">'+sh.name+'</div>';
+    html+='<div style="font-size:11px;color:var(--text-muted)">'+(isW?'Làm việc tại quán 在店工作':'Nhà đầu tư 投資者')+' — '+sh.percent+'% lợi nhuận</div></div></div>';
+    html+='<button onclick="downloadShareholderPDF(&quot;'+sh.id+'&quot;)" style="padding:8px 20px;border-radius:20px;border:none;background:var(--primary);color:#fff;font-weight:700;font-size:11px;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,0.3)">📄 Tải PDF</button>';
+    html+='</div>';
+
+    // Info grid
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">';
+    html+='<div style="padding:12px;border-radius:10px;background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(99,102,241,0.03));text-align:center;border:1px solid rgba(99,102,241,0.15)">';
+    html+='<div style="font-size:10px;color:var(--text-muted)">Tỷ lệ LN 利潤比例</div><div style="font-size:22px;font-weight:800;color:var(--primary)">'+sh.percent+'%</div></div>';
+    if(isW){
+        html+='<div style="padding:12px;border-radius:10px;background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(139,92,246,0.03));text-align:center;border:1px solid rgba(139,92,246,0.15)">';
+        html+='<div style="font-size:10px;color:var(--text-muted)">Lương cơ bản 基本薪資</div><div style="font-size:16px;font-weight:800;color:var(--purple)">'+fmt(sh.salary||0)+'</div></div>';
+    }
+    html+='<div style="padding:12px;border-radius:10px;background:linear-gradient(135deg,rgba(16,185,129,0.1),rgba(16,185,129,0.03));text-align:center;border:1px solid rgba(16,185,129,0.15)">';
+    html+='<div style="font-size:10px;color:var(--text-muted)">Vốn đầu tư 投資額</div><div style="font-size:16px;font-weight:800;color:var(--success)">'+fmtNum(sh.investment||0)+'</div></div>';
+    html+='</div></div>';
+
+    // === Lợi tức history ===
+    var totalDiv=0,totalPaid=0,divRows=[];
+    locks.forEach(function(lock){
+        var div=calcLockDistributable(lock);
+        var myDiv=Math.round(div*sh.percent/100);
+        var shPaid=lock.shares?lock.shares.find(function(s){return s.shId===shId}):null;
+        var isPaid=shPaid&&shPaid.paid;
+        totalDiv+=myDiv;
+        if(isPaid) totalPaid+=myDiv;
+        divRows.push({period:'T'+lock.month+'/'+lock.year,amount:myDiv,isPaid:isPaid,paidAt:isPaid&&shPaid.paidAt?new Date(shPaid.paidAt).toLocaleDateString('vi-VN'):'—'});
+    });
+
+    html+='<div class="card" style="padding:14px">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-weight:700;font-size:13px">💰 Lợi tức 分紅</div>';
+    html+='<div style="display:flex;gap:12px"><span style="font-size:10px;color:var(--text-muted)">Tổng: <strong style="color:var(--primary)">'+fmt(totalDiv)+'</strong></span>';
+    html+='<span style="font-size:10px;color:var(--text-muted)">Đã nhận: <strong style="color:var(--success)">'+fmt(totalPaid)+'</strong></span>';
+    html+='<span style="font-size:10px;color:var(--text-muted)">Chưa nhận: <strong style="color:var(--danger)">'+fmt(totalDiv-totalPaid)+'</strong></span></div></div>';
+
+    if(divRows.length>0){
+        html+='<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px;text-align:left">Kỳ 期間</th><th style="padding:6px 8px;text-align:right">Lợi tức 分紅</th><th style="padding:6px 8px;text-align:center">Trạng thái 狀態</th><th style="padding:6px 8px;text-align:center">Ngày chi 付款日</th></tr></thead><tbody>';
+        divRows.forEach(function(r){
+            html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 8px;font-weight:600">'+r.period+'</td>';
+            html+='<td style="padding:5px 8px;text-align:right;font-weight:700;color:var(--success)">'+fmt(r.amount)+'</td>';
+            html+='<td style="padding:5px 8px;text-align:center"><span style="padding:2px 10px;border-radius:8px;font-size:9px;font-weight:600;background:'+(r.isPaid?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)')+';color:'+(r.isPaid?'var(--success)':'var(--warning)')+'">'+(r.isPaid?'✅ Đã chi':'⏳ Chưa')+'</span></td>';
+            html+='<td style="padding:5px 8px;text-align:center;font-size:10px;color:var(--text-muted)">'+r.paidAt+'</td></tr>';
+        });
+        html+='</tbody></table>';
+    } else {
+        html+='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">Chưa có lợi tức</div>';
+    }
+    html+='</div>';
+
+    // === Phúc lợi history ===
+    var totalBf=0,totalBfRec=0;
+    entries.forEach(function(e){totalBf+=e.amount||0;if(e.status==='received')totalBfRec+=e.amount||0});
+
+    html+='<div class="card" style="padding:14px">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-weight:700;font-size:13px">🎁 Phúc lợi 福利</div>';
+    html+='<div style="display:flex;gap:12px"><span style="font-size:10px;color:var(--text-muted)">Tổng: <strong style="color:var(--warning)">'+fmt(totalBf)+'</strong></span>';
+    html+='<span style="font-size:10px;color:var(--text-muted)">Đã nhận: <strong style="color:var(--success)">'+fmt(totalBfRec)+'</strong></span></div></div>';
+
+    if(entries.length>0){
+        html+='<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px;text-align:left">Ngày 日期</th><th style="padding:6px 8px;text-align:left">Hạng mục 項目</th><th style="padding:6px 8px;text-align:right">Số tiền 金額</th><th style="padding:6px 8px;text-align:center">T.Thái 狀態</th></tr></thead><tbody>';
+        entries.forEach(function(e){
+            html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 8px;font-size:10px">'+(e.date||'—')+'</td>';
+            html+='<td style="padding:5px 8px">'+(e.catName||'—')+'</td>';
+            html+='<td style="padding:5px 8px;text-align:right;font-weight:600">'+fmt(e.amount||0)+'</td>';
+            html+='<td style="padding:5px 8px;text-align:center"><span style="padding:2px 10px;border-radius:8px;font-size:9px;font-weight:600;background:'+(e.status==='received'?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)')+';color:'+(e.status==='received'?'var(--success)':'var(--warning)')+'">'+(e.status==='received'?'✅ Đã nhận':'⏳ Chưa')+'</span></td></tr>';
+        });
+        html+='</tbody></table>';
+    } else {
+        html+='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">Chưa có phúc lợi</div>';
+    }
+    html+='</div>';
+
+    // === Tổng kết ===
+    html+='<div class="card" style="padding:14px;background:linear-gradient(135deg,rgba(99,102,241,0.04),rgba(34,197,94,0.04))">';
+    html+='<div style="font-weight:700;font-size:13px;margin-bottom:12px">📊 Tổng kết 總結</div>';
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">';
+    html+='<div style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.8);text-align:center;border:1px solid rgba(99,102,241,0.15)">';
+    html+='<div style="font-size:10px;color:var(--text-muted)">Tổng thu nhập 總收入</div><div style="font-size:16px;font-weight:800;color:var(--primary)">'+fmt(totalDiv+totalBf)+'</div></div>';
+    html+='<div style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.8);text-align:center;border:1px solid rgba(16,185,129,0.15)">';
+    html+='<div style="font-size:10px;color:var(--text-muted)">Đã nhận thực tế 已領</div><div style="font-size:16px;font-weight:800;color:var(--success)">'+fmt(totalPaid+totalBfRec)+'</div></div>';
+    html+='<div style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.8);text-align:center;border:1px solid rgba(239,68,68,0.15)">';
+    html+='<div style="font-size:10px;color:var(--text-muted)">Chưa nhận 未領</div><div style="font-size:16px;font-weight:800;color:var(--danger)">'+fmt((totalDiv-totalPaid)+(totalBf-totalBfRec))+'</div></div>';
+    html+='</div></div>';
+
+    document.getElementById('loitucOverviewContent').innerHTML=html;
 }
 
 // Keep fmtInput for dividend section
@@ -5582,6 +5799,345 @@ function fmtInput(el){
 }
 
 // --- LỢI TỨC 分紅 ---
+
+// ====== BẢNG SO SÁNH THEO NGÀY (trong tháng) ======
+// === MULTI-MONTH COMPARISON & PDF DOWNLOAD ===
+function toggleMultiMonthSelect(type){
+    var bar=document.getElementById(type+'-multi-month-bar');
+    var isHidden=bar.style.display==='none';
+    bar.style.display=isHidden?'':'none';
+    if(!isHidden){document.getElementById(type+'-multi-month-result').style.display='none';return}
+    var y=Number(document.getElementById(type==='exp'?'stat-exp-year':'stat-rev-year').value)||new Date().getFullYear();
+    var h='';
+    for(var i=1;i<=12;i++){
+        var curM=new Date().getMonth()+1;
+        var checked=i<=curM?' checked':'';
+        h+='<label style="display:flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;background:var(--bg-secondary);font-size:11px;cursor:pointer"><input type="checkbox" value="'+i+'" class="mm-chk-'+type+'"'+checked+'> T'+i+'</label>';
+    }
+    document.getElementById(type+'-multi-month-checks').innerHTML=h;
+}
+
+function renderMultiMonthCompare(type){
+    var checks=document.querySelectorAll('.mm-chk-'+type+':checked');
+    var months=[];checks.forEach(function(c){months.push(Number(c.value))});
+    if(months.length<2){showToast('Chọn ít nhất 2 tháng!','error');return}
+    months.sort(function(a,b){return a-b});
+    var y=Number(document.getElementById(type==='exp'?'stat-exp-year':'stat-rev-year').value)||new Date().getFullYear();
+    var resultEl=document.getElementById(type+'-multi-month-result');
+    resultEl.style.display='';
+
+    if(type==='exp'){
+        var allExp=(gs(SK.expenses)||[]).filter(function(e){return new Date(e.date).getFullYear()===y});
+        // Get categories across all selected months
+        var allCats={};
+        months.forEach(function(m){
+            var mExps=allExp.filter(function(e){return new Date(e.date).getMonth()+1===m});
+            mExps.forEach(function(e){var cat=e.category||'Khác';if(!allCats[cat])allCats[cat]={}; if(!allCats[cat][m])allCats[cat][m]=0;allCats[cat][m]+=e.amount||0});
+        });
+        var catNames=Object.keys(allCats).sort(function(a,b){
+            var ta=months.reduce(function(s,m){return s+(allCats[a][m]||0)},0);
+            var tb=months.reduce(function(s,m){return s+(allCats[b][m]||0)},0);
+            return tb-ta;
+        });
+        var h='<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px"><div style="padding:10px 14px;font-weight:700;font-size:13px;border-bottom:1px solid var(--border);background:#fff">📊 So sánh chi tiêu '+months.map(function(m){return 'T'+m}).join(' vs ')+'/'+y+'</div>';
+        h+='<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px;text-align:left">Hạng mục</th>';
+        months.forEach(function(m){h+='<th style="padding:6px 8px;text-align:right">T'+m+'</th>'});
+        h+='<th style="padding:6px 8px;text-align:right">TB</th></tr></thead><tbody>';
+        var totals={};months.forEach(function(m){totals[m]=0});
+        catNames.forEach(function(cat){
+            h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 8px;font-weight:600">'+cat+'</td>';
+            var sum=0;
+            months.forEach(function(m){var v=allCats[cat][m]||0;sum+=v;totals[m]+=v;h+='<td style="padding:5px 8px;text-align:right;color:var(--danger)">'+fmtNum(v)+'</td>'});
+            h+='<td style="padding:5px 8px;text-align:right;font-weight:600">'+fmtNum(Math.round(sum/months.length))+'</td></tr>';
+        });
+        h+='<tr style="font-weight:800;border-top:2px solid var(--danger);background:rgba(239,68,68,0.04)"><td style="padding:6px 8px">TỔNG</td>';
+        var gTotal=0;months.forEach(function(m){gTotal+=totals[m];h+='<td style="padding:6px 8px;text-align:right;color:var(--danger)">'+fmtNum(totals[m])+'</td>'});
+        h+='<td style="padding:6px 8px;text-align:right">'+fmtNum(Math.round(gTotal/months.length))+'</td></tr>';
+        h+='</tbody></table></div></div>';
+        resultEl.innerHTML=h;
+    } else {
+        // Revenue multi-month
+        mergeGrabUpdates();
+        var allRevs=(gs(SK.revenues)||[]).filter(function(r){return new Date(r.date).getFullYear()===y});
+        var mData=[];
+        months.forEach(function(m){
+            var mRevs=allRevs.filter(function(r){return new Date(r.date).getMonth()+1===m});
+            var tip=mRevs.reduce(function(s,r){return s+(r.tip||0)},0);
+            var rev=mRevs.reduce(function(s,r){return s+(r.totalActual||0)},0)-tip;
+            var cash=mRevs.reduce(function(s,r){return s+(r.cash1||0)+(r.cash2||0)},0);
+            var tr=mRevs.reduce(function(s,r){return s+(r.transfer||0)},0);
+            var grab=mRevs.reduce(function(s,r){return s+(r.grabNet!==undefined?r.grabNet:(r.grab||0))},0);
+            mData.push({m:m,rev:rev,cash:cash,tr:tr,grab:grab,tip:tip,days:mRevs.length});
+        });
+        var h='<div class="card" style="padding:0;overflow:hidden;margin-bottom:12px"><div style="padding:10px 14px;font-weight:700;font-size:13px;border-bottom:1px solid var(--border);background:#fff">📊 So sánh doanh thu '+months.map(function(m){return 'T'+m}).join(' vs ')+'/'+y+'</div>';
+        h+='<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px;text-align:left">Chỉ tiêu</th>';
+        months.forEach(function(m){h+='<th style="padding:6px 8px;text-align:right">T'+m+'</th>'});
+        h+='</tr></thead><tbody>';
+        var rows=[{label:'Doanh thu 營業額',key:'rev',color:'var(--success)'},{label:'T.Mặt 現金',key:'cash'},{label:'CK 轉帳',key:'tr'},{label:'Grab',key:'grab'},{label:'Tip 小費',key:'tip',color:'var(--warning)'},{label:'Số ngày',key:'days'}];
+        rows.forEach(function(row){
+            h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 8px;font-weight:600">'+row.label+'</td>';
+            mData.forEach(function(d){h+='<td style="padding:5px 8px;text-align:right;'+(row.color?'color:'+row.color+';font-weight:700':'')+'">'+fmtNum(d[row.key])+'</td>'});
+            h+='</tr>';
+        });
+        // Growth row
+        h+='<tr style="border-top:2px solid var(--success);font-weight:700"><td style="padding:5px 8px">Tăng trưởng</td>';
+        mData.forEach(function(d,i){
+            if(i===0){h+='<td style="padding:5px 8px;text-align:right;color:var(--text-muted)">—</td>';return}
+            var prev=mData[i-1].rev;var g=prev>0?((d.rev-prev)/prev*100).toFixed(1):'—';
+            h+='<td style="padding:5px 8px;text-align:right;color:'+(parseFloat(g)>=0?'var(--success)':'var(--danger)')+'">'+g+'%</td>';
+        });
+        h+='</tr></tbody></table></div></div>';
+        resultEl.innerHTML=h;
+    }
+}
+
+function downloadStatsPDF(type){
+    var y,m,title,contentHtml;
+    if(type==='exp'){
+        y=document.getElementById('stat-exp-year').value;
+        m=Number(document.getElementById('stat-exp-month').value);
+        title='BÁO CÁO CHI TIÊU 支出報告';
+        contentHtml=document.getElementById('expenseStatsGrid').innerHTML
+            +(document.getElementById('expAlertBox').innerHTML||'')
+            +'<div style="margin:14px 0">'+document.getElementById('expMonthCompare').innerHTML+'</div>';
+        var mmResult=document.getElementById('exp-multi-month-result');
+        if(mmResult&&mmResult.style.display!=='none') contentHtml+=mmResult.innerHTML;
+    } else if(type==='rev'){
+        y=document.getElementById('stat-rev-year').value;
+        m=Number(document.getElementById('stat-rev-month').value);
+        title='BÁO CÁO DOANH THU 營業額報告';
+        contentHtml=document.getElementById('revenueStatsGrid').innerHTML
+            +(document.getElementById('revAlertBox').innerHTML||'')
+            +'<div style="margin:14px 0">'+document.getElementById('revMonthCompare').innerHTML+'</div>';
+        var mmResult2=document.getElementById('rev-multi-month-result');
+        if(mmResult2&&mmResult2.style.display!=='none') contentHtml+=mmResult2.innerHTML;
+    } else {
+        y=document.getElementById('profit-year').value;
+        m=Number(document.getElementById('profit-month').value);
+        title='BÁO CÁO LỢI NHUẬN 利潤報告';
+        contentHtml=document.getElementById('profitStatsCards').innerHTML
+            +(document.getElementById('profitAlertBox').innerHTML||'')
+            +'<div style="margin:14px 0">'+document.getElementById('profitMonthTable').innerHTML+'</div>';
+        var dayCard=document.getElementById('profitDayTableCard');
+        if(dayCard&&dayCard.style.display!=='none') contentHtml+='<h3 style="margin:14px 0 8px;font-size:13px">Chi tiết theo ngày</h3>'+document.getElementById('profitDayTable').innerHTML;
+        var spCard=document.getElementById('profitSamePeriodCard');
+        if(spCard) contentHtml+='<h3 style="margin:14px 0 8px;font-size:13px">So sánh cùng kỳ</h3>'+document.getElementById('profitSamePeriodTable').innerHTML;
+    }
+
+    var period=y==='all'?'Tất cả năm':(m>0?'Tháng '+m+'/'+y:'Cả năm '+y);
+    var pdfHtml='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+title+' - Quách Gia</title><style>'
+        +'@page{size:A4 landscape;margin:12mm}'
+        +'body{font-family:"Segoe UI",Arial,sans-serif;font-size:12px;color:#333;padding:16px}'
+        +'h1{text-align:center;font-size:18px;color:#4f46e5;margin-bottom:4px}'
+        +'.subtitle{text-align:center;font-size:11px;color:#666;margin-bottom:16px}'
+        +'table{width:100%;border-collapse:collapse;margin-bottom:12px;font-size:10px}'
+        +'th{background:#4f46e5;color:#fff;padding:6px 8px;text-align:left}'
+        +'td{padding:5px 8px;border:1px solid #ddd}'
+        +'canvas{display:none!important}'
+        +'.card{border:1px solid #ddd;border-radius:8px;padding:10px;margin-bottom:10px}'
+        +'.footer{margin-top:20px;text-align:center;font-size:9px;color:#999;border-top:1px solid #eee;padding-top:8px}'
+        +'@media print{body{padding:0}button,.filter-bar{display:none!important}}'
+        +'</style></head><body>'
+        +'<h1>'+title+'</h1>'
+        +'<div class="subtitle">'+period+' — QUÁCH GIA 郭家 · Ngày xuất: '+new Date().toLocaleDateString('vi-VN')+'</div>'
+        +contentHtml
+        +'<div class="footer">Báo cáo tự động — Quách Gia App · '+new Date().toLocaleString('vi-VN')+'</div>'
+        +'<script>window.onload=function(){window.print()}<\/script>'
+        +'</body></html>';
+
+    var w=window.open('','_blank','width=1000,height=700');
+    if(w){w.document.write(pdfHtml);w.document.close()}
+    else{showToast('Popup bị chặn!','error')}
+}
+
+function renderProfitDayTable(y,m){
+    var card=document.getElementById('profitDayTableCard');
+    if(!card)return;
+    if(!m||m===0){card.style.display='none';return}
+    card.style.display='';
+    var revs=(gs(SK.revenues)||[]).filter(function(r){var d=new Date(r.date);return d.getFullYear()===y&&d.getMonth()+1===m});
+    var exps=(gs(SK.expenses)||[]).filter(function(e){var d=new Date(e.date);return d.getFullYear()===y&&d.getMonth()+1===m});
+    mergeGrabUpdates();revs=revs.length?revs:(gs(SK.revenues)||[]).filter(function(r){var d=new Date(r.date);return d.getFullYear()===y&&d.getMonth()+1===m});
+    var daysInMonth=new Date(y,m,0).getDate();
+    var dayData=[];var cumRev=0,cumExp=0;
+    for(var dd=1;dd<=daysInMonth;dd++){
+        var ds=y+'-'+String(m).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+        var dRevs=revs.filter(function(r){return r.date===ds});
+        var tip=dRevs.reduce(function(s,r){return s+(r.tip||0)},0);
+        var rev=dRevs.reduce(function(s,r){return s+(r.totalActual||0)},0)-tip;
+        var exp=exps.filter(function(e){return e.date===ds}).reduce(function(s,e){return s+e.amount},0);
+        cumRev+=rev;cumExp+=exp;
+        dayData.push({day:dd,ds:ds,rev:rev,exp:exp,profit:rev-exp,cumRev:cumRev,cumExp:cumExp,cumProfit:cumRev-cumExp});
+    }
+    var today=todayVN();
+    var h='<table style="width:100%;font-size:11px"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px">Ngày 日</th><th style="text-align:right;padding:6px 8px">DT 營收</th><th style="text-align:right;padding:6px 8px">CT 支出</th><th style="text-align:right;padding:6px 8px">LN 利潤</th><th style="text-align:right;padding:6px 8px">LN lũy kế 累計</th></tr></thead><tbody>';
+    var tRev=0,tExp=0;
+    dayData.forEach(function(d){
+        if(d.rev===0&&d.exp===0&&d.ds>today)return;
+        tRev+=d.rev;tExp+=d.exp;
+        var pColor=d.profit>=0?'var(--success)':'var(--danger)';
+        var cpColor=d.cumProfit>=0?'var(--success)':'var(--danger)';
+        var isToday=d.ds===today?' style="background:rgba(99,102,241,0.06);font-weight:700"':'';
+        h+='<tr'+isToday+'><td style="padding:4px 8px">'+d.day+'/'+(m<10?'0':'')+m+'</td><td onclick="showProfitDayDetail(\''+d.ds+'\',\'rev\')" style="text-align:right;padding:4px 8px;color:var(--success);cursor:pointer;text-decoration:underline dotted" title="Bấm xem chi tiết">'+fmtNum(d.rev)+'</td><td onclick="showProfitDayDetail(\''+d.ds+'\',\'exp\')" style="text-align:right;padding:4px 8px;color:var(--danger);cursor:pointer;text-decoration:underline dotted" title="Bấm xem chi tiết">'+fmtNum(d.exp)+'</td><td style="text-align:right;padding:4px 8px;font-weight:700;color:'+pColor+'">'+fmtNum(d.profit)+'</td><td style="text-align:right;padding:4px 8px;color:'+cpColor+'">'+fmtNum(d.cumProfit)+'</td></tr>';
+    });
+    h+='<tr style="font-weight:800;border-top:2px solid var(--border);background:var(--bg-secondary)"><td style="padding:6px 8px">TỔNG</td><td style="text-align:right;padding:6px 8px;color:var(--success)">'+fmtNum(tRev)+'</td><td style="text-align:right;padding:6px 8px;color:var(--danger)">'+fmtNum(tExp)+'</td><td style="text-align:right;padding:6px 8px;color:'+(tRev-tExp>=0?'var(--success)':'var(--danger)')+'">'+fmtNum(tRev-tExp)+'</td><td></td></tr>';
+    h+='</tbody></table>';
+    document.getElementById('profitDayTable').innerHTML=h;
+}
+
+function showProfitDayDetail(ds,type){
+    var revs=(gs(SK.revenues)||[]).filter(function(r){return r.date===ds});
+    var exps=(gs(SK.expenses)||[]).filter(function(e){return e.date===ds});
+    mergeGrabUpdates();
+    var parts=ds.split('-');var dayLabel=parts[2]+'/'+parts[1]+'/'+parts[0];
+    var h='<div style="padding:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div style="font-weight:800;font-size:14px">'+(type==='rev'?'📊 Chi tiết Doanh thu':'📋 Chi tiết Chi tiêu')+' — '+dayLabel+'</div><button onclick="this.closest(\'.cat-detail-overlay\').style.display=\'none\'" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:var(--bg-secondary);cursor:pointer;font-size:14px">✕</button></div>';
+    if(type==='rev'){
+        // Revenue breakdown
+        var tip=revs.reduce(function(s,r){return s+(r.tip||0)},0);
+        var totalRev=revs.reduce(function(s,r){return s+(r.totalActual||0)},0)-tip;
+        var cash=revs.reduce(function(s,r){return s+(r.cash1||0)+(r.cash2||0)},0);
+        var transfer=revs.reduce(function(s,r){return s+(r.transfer||0)},0);
+        var grab=revs.reduce(function(s,r){return s+(r.grabNet!==undefined?r.grabNet:(r.grab||0))},0);
+        var staff=revs.reduce(function(s,r){return s+(r.staffAmount||0)},0);
+        h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px">';
+        h+='<div style="padding:10px;text-align:center;border-radius:8px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15)"><div style="font-size:9px;color:var(--text-muted)">Tổng DT</div><div style="font-weight:800;color:var(--success);font-size:14px">'+fmtNum(totalRev)+'</div></div>';
+        h+='<div style="padding:10px;text-align:center;border-radius:8px;background:var(--bg-secondary);border:1px solid var(--border)"><div style="font-size:9px;color:var(--text-muted)">T.Mặt 現金</div><div style="font-weight:700;font-size:13px">'+fmtNum(cash)+'</div></div>';
+        h+='<div style="padding:10px;text-align:center;border-radius:8px;background:var(--bg-secondary);border:1px solid var(--border)"><div style="font-size:9px;color:var(--text-muted)">CK 轉帳</div><div style="font-weight:700;font-size:13px">'+fmtNum(transfer)+'</div></div>';
+        h+='<div style="padding:10px;text-align:center;border-radius:8px;background:var(--bg-secondary);border:1px solid var(--border)"><div style="font-size:9px;color:var(--text-muted)">Grab</div><div style="font-weight:700;font-size:13px">'+fmtNum(grab)+'</div></div>';
+        if(staff>0){h+='<div style="padding:10px;text-align:center;border-radius:8px;background:var(--bg-secondary);border:1px solid var(--border)"><div style="font-size:9px;color:var(--text-muted)">NV 員工</div><div style="font-weight:700;font-size:13px">'+fmtNum(staff)+'</div></div>';}
+        if(tip>0){h+='<div style="padding:10px;text-align:center;border-radius:8px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15)"><div style="font-size:9px;color:var(--text-muted)">Tip 小費</div><div style="font-weight:700;font-size:13px;color:var(--warning)">'+fmtNum(tip)+'</div></div>';}
+        h+='</div>';
+        // Per-shift detail
+        if(revs.length>0){
+            h+='<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px;text-align:left">Ca 班次</th><th style="padding:6px 8px;text-align:right">T.Mặt</th><th style="padding:6px 8px;text-align:right">CK</th><th style="padding:6px 8px;text-align:right">Grab</th><th style="padding:6px 8px;text-align:right">Tổng</th></tr></thead><tbody>';
+            revs.forEach(function(r,i){
+                var rCash=(r.cash1||0)+(r.cash2||0);
+                var rTr=r.transfer||0;
+                var rGr=r.grabNet!==undefined?r.grabNet:(r.grab||0);
+                var rTip=r.tip||0;
+                var rTotal=(r.totalActual||0)-rTip;
+                h+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 8px;font-weight:600">Ca '+(i+1)+'</td><td style="padding:5px 8px;text-align:right">'+fmtNum(rCash)+'</td><td style="padding:5px 8px;text-align:right">'+fmtNum(rTr)+'</td><td style="padding:5px 8px;text-align:right">'+fmtNum(rGr)+'</td><td style="padding:5px 8px;text-align:right;font-weight:700;color:var(--success)">'+fmtNum(rTotal)+'</td></tr>';
+            });
+            h+='</tbody></table>';
+        }
+    } else {
+        // Expense breakdown by category
+        var catMap={};var total=0;
+        exps.forEach(function(e){
+            var cat=e.category||'Chưa phân loại';
+            if(!catMap[cat]) catMap[cat]={total:0,items:[]};
+            catMap[cat].total+=e.amount||0;
+            catMap[cat].items.push(e);
+            total+=e.amount||0;
+        });
+        var cats=Object.keys(catMap).sort(function(a,b){return catMap[b].total-catMap[a].total});
+        h+='<div style="padding:10px;text-align:center;border-radius:8px;background:rgba(239,68,68,0.06);border:1.5px solid rgba(239,68,68,0.15);margin-bottom:14px"><div style="font-size:10px;color:var(--text-muted)">Tổng chi tiêu 總支出</div><div style="font-weight:800;color:var(--danger);font-size:18px">'+fmt(total)+'</div><div style="font-size:10px;color:var(--text-muted)">'+exps.length+' khoản · '+cats.length+' hạng mục</div></div>';
+        h+='<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px;text-align:left">Hạng mục 項目</th><th style="padding:6px 8px;text-align:right">Số tiền 金額</th><th style="padding:6px 8px;text-align:right">%</th><th style="padding:6px 8px;text-align:right">SL</th></tr></thead><tbody>';
+        cats.forEach(function(cat){
+            var c=catMap[cat];
+            var pct=total>0?(c.total/total*100).toFixed(1):'0';
+            h+='<tr style="border-bottom:1px solid #f0f0f0;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'\':\'none\'">';
+            h+='<td style="padding:6px 8px;font-weight:600">▸ '+cat+'</td>';
+            h+='<td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--danger)">'+fmtNum(c.total)+'</td>';
+            h+='<td style="padding:6px 8px;text-align:right;color:var(--text-muted)">'+pct+'%</td>';
+            h+='<td style="padding:6px 8px;text-align:right">'+c.items.length+'</td></tr>';
+            // Sub-items (hidden by default)
+            h+='<tr style="display:none"><td colspan="4" style="padding:0"><table style="width:100%;font-size:10px;border-collapse:collapse;background:var(--bg-secondary)">';
+            c.items.forEach(function(e){
+                h+='<tr style="border-bottom:1px solid rgba(0,0,0,0.05)"><td style="padding:4px 8px 4px 24px;color:var(--text-muted)">'+(e.note||e.description||'—')+'</td><td style="padding:4px 8px;text-align:right;font-weight:600;color:var(--danger)">'+fmtNum(e.amount)+'</td><td style="padding:4px 8px;text-align:right;font-size:9px;color:var(--text-muted)">'+(e.payMethod||'')+'</td><td style="padding:4px 8px;text-align:right;font-size:9px;color:var(--text-muted)">'+(e.supplier||'')+'</td></tr>';
+            });
+            h+='</table></td></tr>';
+        });
+        h+='</tbody></table>';
+    }
+    h+='</div>';
+    // Use existing overlay or create one
+    var overlay=document.getElementById('profitDayDetailOverlay');
+    if(!overlay){
+        overlay=document.createElement('div');
+        overlay.id='profitDayDetailOverlay';
+        overlay.className='cat-detail-overlay';
+        overlay.onclick=function(ev){if(ev.target===overlay)overlay.style.display='none'};
+        overlay.innerHTML='<div class="cat-detail-popup" style="max-width:600px;max-height:85vh;overflow-y:auto"></div>';
+        document.body.appendChild(overlay);
+    }
+    overlay.querySelector('.cat-detail-popup').innerHTML=h;
+    overlay.style.display='flex';
+}
+
+// ====== SO SÁNH CÙNG KỲ ======
+function renderSamePeriodComparison(y,m){
+    var card=document.getElementById('profitSamePeriodCard');
+    if(!card)return;
+    var allRevs=gs(SK.revenues)||[];var allExps=gs(SK.expenses)||[];
+    mergeGrabUpdates();allRevs=gs(SK.revenues)||[];
+    var today=todayVN();
+    var todayDay=new Date(today).getDate();
+    // Get all available months
+    var months=[];
+    var yearMonthSet={};
+    allRevs.forEach(function(r){var d=new Date(r.date);var k=d.getFullYear()*100+d.getMonth()+1;yearMonthSet[k]={y:d.getFullYear(),m:d.getMonth()+1}});
+    allExps.forEach(function(e){var d=new Date(e.date);var k=d.getFullYear()*100+d.getMonth()+1;yearMonthSet[k]={y:d.getFullYear(),m:d.getMonth()+1}});
+    months=Object.values(yearMonthSet).sort(function(a,b){return(a.y*100+a.m)-(b.y*100+b.m)});
+    if(months.length<2){card.style.display='none';return}
+    card.style.display='';
+    // Part 1: Same day comparison (ngày 1-todayDay of current month vs same period of previous months)
+    var refDay=todayDay;
+    var h='<div style="padding:12px">';
+    // Same-day comparison across months
+    h+='<h4 style="font-size:12px;font-weight:700;margin-bottom:8px">🔄 So sánh cùng ngày 1~'+refDay+' các tháng <span style="color:var(--text-muted);font-weight:400;font-size:10px">各月同日期比較</span></h4>';
+    h+='<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px">Tháng 月份</th><th style="text-align:right;padding:6px 8px">DT (1~'+refDay+') 營收</th><th style="text-align:right;padding:6px 8px">CT (1~'+refDay+') 支出</th><th style="text-align:right;padding:6px 8px">LN (1~'+refDay+') 利潤</th><th style="text-align:right;padding:6px 8px">Biên LN 利潤率</th><th style="text-align:right;padding:6px 8px">vs tháng trước 環比</th></tr></thead><tbody>';
+    var prevProfit=null;
+    var sameDayData=[];
+    months.forEach(function(mo){
+        var maxDay=refDay;
+        var rev=0,exp=0;
+        allRevs.forEach(function(r){
+            var d=new Date(r.date);
+            if(d.getFullYear()===mo.y&&d.getMonth()+1===mo.m&&d.getDate()<=maxDay){
+                var tip=r.tip||0;rev+=(r.totalActual||0)-tip;
+            }
+        });
+        allExps.forEach(function(e){
+            var d=new Date(e.date);
+            if(d.getFullYear()===mo.y&&d.getMonth()+1===mo.m&&d.getDate()<=maxDay)exp+=e.amount;
+        });
+        var profit=rev-exp;
+        sameDayData.push({label:'T'+mo.m+'/'+mo.y,rev:rev,exp:exp,profit:profit,margin:rev>0?(profit/rev*100).toFixed(1):'0'});
+    });
+    sameDayData.forEach(function(d,i){
+        var vsStr='—';
+        if(i>0){
+            var prev=sameDayData[i-1].profit;
+            var diff=d.profit-prev;
+            var pct=prev!==0?((diff/Math.abs(prev))*100).toFixed(1):'—';
+            vsStr='<span style="color:'+(diff>=0?'var(--success)':'var(--danger)')+'">'+((diff>=0?'+':'')+fmtNum(diff))+' ('+(pct!=='—'?pct+'%':'')+') '+(diff>=0?'📈':'📉')+'</span>';
+        }
+        var isCurrent=i===sameDayData.length-1;
+        h+='<tr'+(isCurrent?' style="background:rgba(99,102,241,0.06);font-weight:700"':'')+'><td style="padding:5px 8px">'+d.label+(isCurrent?' ⬅️':'')+'</td><td style="text-align:right;padding:5px 8px;color:var(--success)">'+fmtNum(d.rev)+'</td><td style="text-align:right;padding:5px 8px;color:var(--danger)">'+fmtNum(d.exp)+'</td><td style="text-align:right;padding:5px 8px;font-weight:700;color:'+(d.profit>=0?'var(--success)':'var(--danger)')+'">'+fmtNum(d.profit)+'</td><td style="text-align:right;padding:5px 8px">'+d.margin+'%</td><td style="text-align:right;padding:5px 8px;font-size:10px">'+vsStr+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+    // Part 2: Same month year-over-year (if applicable)
+    if(m>0){
+        var sameMonthData=[];
+        var years=[...new Set(months.filter(function(mo){return mo.m===m}).map(function(mo){return mo.y}))].sort();
+        if(years.length>=1){
+            h+='<h4 style="font-size:12px;font-weight:700;margin:16px 0 8px">📅 So sánh T'+m+' qua các năm <span style="color:var(--text-muted);font-weight:400;font-size:10px">各年度同月比較</span></h4>';
+            h+='<div style="overflow-x:auto"><table style="width:100%;font-size:11px"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px">Năm 年</th><th style="text-align:right;padding:6px 8px">DT 營收</th><th style="text-align:right;padding:6px 8px">CT 支出</th><th style="text-align:right;padding:6px 8px">LN 利潤</th><th style="text-align:right;padding:6px 8px">Biên LN 利潤率</th></tr></thead><tbody>';
+            years.forEach(function(yr){
+                var rev=0,exp=0;
+                allRevs.forEach(function(r){var d=new Date(r.date);if(d.getFullYear()===yr&&d.getMonth()+1===m){var tip=r.tip||0;rev+=(r.totalActual||0)-tip}});
+                allExps.forEach(function(e){var d=new Date(e.date);if(d.getFullYear()===yr&&d.getMonth()+1===m)exp+=e.amount});
+                var profit=rev-exp;
+                h+='<tr><td style="padding:5px 8px;font-weight:700">T'+m+'/'+yr+'</td><td style="text-align:right;padding:5px 8px;color:var(--success)">'+fmtNum(rev)+'</td><td style="text-align:right;padding:5px 8px;color:var(--danger)">'+fmtNum(exp)+'</td><td style="text-align:right;padding:5px 8px;font-weight:700;color:'+(profit>=0?'var(--success)':'var(--danger)')+'">'+fmtNum(profit)+'</td><td style="text-align:right;padding:5px 8px">'+(rev>0?(profit/rev*100).toFixed(1):'0')+'%</td></tr>';
+            });
+            h+='</tbody></table></div>';
+        }
+    }
+    h+='</div>';
+    document.getElementById('profitSamePeriodTable').innerHTML=h;
+}
+
 function getDividendSettings(){
     return gs(SK.dividendSettings)||{workingPct:40,tggtPct:3,tncnPct:1.5,govSupport:0};
 }
@@ -5985,7 +6541,7 @@ function lockDividend(){
     const cumul=getCumulativeProfit(now.getFullYear(),now.getMonth()+1,null);
     const settings=getDividendSettings();
     // Subtract previously paid dividends from cumulative profit
-    const totalPaidOut=locks.reduce((s,l)=>s+(l.paidTotal||0),0);
+    const totalPaidOut=locks.reduce((s,l)=>s+(l.paidTotal||calcLockDistributable(l)),0);
     const adjustedProfit=cumul.profit-totalPaidOut;
     locks.push({
         id:Date.now().toString(), year:y, month:m, lockedAt:new Date().toISOString(),
@@ -6104,7 +6660,7 @@ function renderDividendActual(){
     const now=new Date();
     const currentCumul=getCumulativeProfit(now.getFullYear(),now.getMonth()+1,null);
     const allLocks=getDividendLocks();
-    const totalPaidPrior=allLocks.filter(l=>l.id!==(lock?lock.id:'')).reduce((s,l)=>s+(l.paidTotal||0),0);
+    const totalPaidPrior=allLocks.filter(l=>l.id!==(lock?lock.id:'')).reduce((s,l)=>s+(l.paidTotal||calcLockDistributable(l)),0);
     const adjustedCurrentProfit=currentCumul.profit-totalPaidPrior;
     html+=`<div style="margin-bottom:14px;padding:16px 18px;border-radius:12px;border:1.5px solid rgba(99,102,241,0.3);background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(99,102,241,0.01))">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -6113,9 +6669,9 @@ function renderDividendActual(){
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
             <div style="padding:8px 12px;background:rgba(255,255,255,0.7);border-radius:8px;border:1px solid rgba(99,102,241,0.15)">
-                <div style="font-size:10px;color:var(--text-muted)">LN hiện tại (sau khấu trừ LT đã chi) 扣除已付分紅</div>
+                <div style="font-size:10px;color:var(--text-muted)">LN hiện tại (sau khấu trừ LT đã phân phối) 扣除已分配分紅</div>
                 <div style="font-size:16px;font-weight:800;color:${adjustedCurrentProfit>=0?'var(--success)':'var(--danger)'}">${fmt(adjustedCurrentProfit)}</div>
-                ${totalPaidPrior>0?`<div style="font-size:9px;color:var(--text-muted);margin-top:2px">Gốc: ${fmtNum(currentCumul.profit)} − LT đã chi: ${fmtNum(totalPaidPrior)}</div>`:''}
+                ${totalPaidPrior>0?`<div style="font-size:9px;color:var(--text-muted);margin-top:2px">Gốc: ${fmtNum(currentCumul.profit)} − Đã phân phối: ${fmtNum(totalPaidPrior)}</div>`:''}
             </div>
             <div style="padding:8px 12px;background:rgba(255,255,255,0.7);border-radius:8px;border:1px solid ${lock?'rgba(34,197,94,0.3)':'rgba(148,163,184,0.2)'}">
                 <div style="font-size:10px;color:var(--text-muted)">LN đã chốt 已鎖定利潤</div>
@@ -6296,6 +6852,12 @@ function renderDividendActual(){
         html+=`</tbody></table></div>`;
     }
 
+    // === NÚT TẢI BÁO CÁO PDF ===
+    html+=`<div style="text-align:center;margin-top:16px;padding:14px;background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(34,197,94,0.04));border-radius:12px;border:1.5px solid rgba(99,102,241,0.2)">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Tải báo cáo phân phối lợi tức cho cổ đông 下載分紅報告</div>
+        <button onclick="downloadDividendPDF(${y},${m})" style="padding:10px 28px;border-radius:20px;border:none;background:var(--primary);color:#fff;font-weight:700;font-size:12px;cursor:pointer;box-shadow:0 2px 8px rgba(99,102,241,0.3)">📄 Tải báo cáo PDF T${m}/${y}</button>
+    </div>`;
+
     document.getElementById('dividendActualContent').innerHTML=html;
     renderDividendLockHistory();
 }
@@ -6332,6 +6894,223 @@ function renderDividendLockHistory(){
     });
     html+=`</tbody></table>`;
     document.getElementById('dividendLockHistory').innerHTML=html;
+}
+
+// === PDF Download Functions ===
+function downloadDividendPDF(y,m){
+    const locks=getDividendLocks();
+    const lock=locks.find(l=>l.year===y&&l.month===m);
+    if(!lock){showToast('Chưa chốt tháng này!','error');return}
+    const shs=gs(SK.shareholders)||[];
+    const entries=gs(SK.benefitEntries)||[];
+    const wPct=lock.workingPct!==undefined?lock.workingPct:40;
+    const wA=Math.round(lock.cumulProfit*wPct/100);
+    const rA=lock.reserveAmt||0;const sA=lock.salaryAmt||0;
+    const tR=lock.taxRevenue||0;const gS=lock.govSupport||0;
+    const tgP=lock.tggtPct!==undefined?lock.tggtPct:3;
+    const tnP=lock.tncnPct!==undefined?lock.tncnPct:1.5;
+    const tgA=Math.round(tR*tgP/100);
+    const tnA=Math.max(0,Math.round((tR-gS)*tnP/100));
+    const tT=tgA+tnA;
+    const oF=(lock.otherFees||[]).reduce((s,f)=>s+(f.amount||0),0);
+    const dividend=lock.cumulProfit-wA-rA-sA-tT-oF;
+
+    let shHtml='';
+    shs.forEach(sh=>{
+        const myDiv=Math.round(dividend*sh.percent/100);
+        const bfAmt=entries.filter(e=>e.shareholderId===sh.id&&e.status==='received').reduce((s,e)=>{
+            const d=e.date?new Date(e.date):null;
+            if(d&&d.getFullYear()===y&&d.getMonth()+1===m) return s+(e.amount||0);return s;
+        },0);
+        const net=myDiv-bfAmt;
+        const shPaid=lock.shares?lock.shares.find(s=>s.shId===sh.id):null;
+        const isPaid=shPaid&&shPaid.paid;
+        shHtml+=`<tr><td style="padding:8px 12px;font-weight:600;border:1px solid #ddd">${sh.name}</td>
+            <td style="padding:8px 12px;text-align:center;border:1px solid #ddd">${sh.percent}%</td>
+            <td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${fmtNum(myDiv)}</td>
+            <td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${bfAmt>0?'-'+fmtNum(bfAmt):'—'}</td>
+            <td style="padding:8px 12px;text-align:right;font-weight:700;border:1px solid #ddd">${fmtNum(net)}</td>
+            <td style="padding:8px 12px;text-align:center;border:1px solid #ddd">${isPaid?'Đã chi ✅':'Chưa chi ⏳'}</td></tr>`;
+    });
+
+    let byYearHtml='';
+    if(lock.byYear){lock.byYear.forEach(yr=>{
+        byYearHtml+=`<tr><td style="padding:6px 12px;padding-left:28px;border:1px solid #ddd;color:#666">↳ ${yr.y}: DT ${fmtNum(yr.rev)} − CT ${fmtNum(yr.exp)}</td>
+            <td style="text-align:right;padding:6px 12px;border:1px solid #ddd;font-weight:600">${fmtNum(yr.profit)}</td></tr>`;
+    })}
+
+    let feesHtml='';
+    if(lock.otherFees&&lock.otherFees.length>0){
+        lock.otherFees.forEach(f=>{
+            feesHtml+=`<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) ${f.name||'Phí khác'}</td>
+                <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(f.amount||0)}</td></tr>`;
+        });
+    }
+
+    const pdfHtml=`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Báo cáo Lợi Tức T${m}/${y} - Quách Gia</title>
+<style>
+@page{size:A4;margin:15mm}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#333;line-height:1.5;padding:20px}
+h1{text-align:center;font-size:20px;color:#4f46e5;margin-bottom:4px}
+h2{font-size:14px;color:#4f46e5;margin:18px 0 8px;border-bottom:2px solid #4f46e5;padding-bottom:4px}
+.subtitle{text-align:center;font-size:12px;color:#666;margin-bottom:20px}
+table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11px}
+th{background:#4f46e5;color:#fff;padding:8px 12px;text-align:left;font-weight:600}
+td{padding:6px 12px;border:1px solid #ddd}
+.total-row{background:#f0fdf4;font-weight:800;font-size:13px}
+.deduct-row td{color:#ef4444}
+.result-row{background:#4f46e5;color:#fff;font-weight:800;font-size:14px}
+.result-row td{border-color:#4f46e5;color:#fff}
+.footer{margin-top:30px;text-align:center;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:10px}
+.sign-area{display:flex;justify-content:space-around;margin-top:40px}
+.sign-box{text-align:center;min-width:150px}
+.sign-box .label{font-weight:600;margin-bottom:50px}
+.sign-box .line{border-top:1px solid #333;padding-top:4px;font-size:10px;color:#666}
+@media print{body{padding:0}button{display:none!important}}
+</style></head><body>
+<h1>BÁO CÁO PHÂN PHỐI LỢI TỨC 分紅分配報告</h1>
+<div class="subtitle">Kỳ: Tháng ${m}/${y} — QUÁCH GIA 郭家<br>Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}</div>
+
+<h2>I. Tổng hợp lợi nhuận & khấu trừ 利潤與扣除彙總</h2>
+<table>
+<tr><td style="padding:8px 12px;border:1px solid #ddd;font-weight:700">🔒 LN đã chốt T${m}/${y}</td>
+    <td style="text-align:right;padding:8px 12px;border:1px solid #ddd;font-weight:700;font-size:14px">${fmtNum(lock.cumulProfit)}</td></tr>
+${byYearHtml}
+<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Vốn lưu động ${wPct}%</td>
+    <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(wA)}</td></tr>
+${rA>0?`<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Quỹ dự bị</td>
+    <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(rA)}</td></tr>`:''}
+<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Thuế TGGT ${tgP}%</td>
+    <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(tgA)}</td></tr>
+<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Thuế TNCN ${tnP}%</td>
+    <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(tnA)}</td></tr>
+${sA>0?`<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Lương cơ bản</td>
+    <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(sA)}</td></tr>`:''}
+${feesHtml}
+<tr class="result-row"><td style="padding:10px 12px;border:1px solid #4f46e5">= LỢI TỨC THỰC TẾ T${m}/${y}</td>
+    <td style="text-align:right;padding:10px 12px;border:1px solid #4f46e5;font-size:16px">${fmtNum(dividend)} ₫</td></tr>
+</table>
+
+<h2>II. Phân phối theo cổ đông 按股東分配</h2>
+<table>
+<thead><tr><th>Cổ đông</th><th style="text-align:center">Tỷ lệ %</th><th style="text-align:right">Lợi tức</th><th style="text-align:right">PL khấu trừ</th><th style="text-align:right">Thực nhận</th><th style="text-align:center">Trạng thái</th></tr></thead>
+<tbody>${shHtml}</tbody>
+</table>
+
+<div class="sign-area">
+<div class="sign-box"><div class="label">Người lập báo cáo</div><div class="line">Ký tên, ghi rõ họ tên</div></div>
+<div class="sign-box"><div class="label">Đại diện cổ đông</div><div class="line">Ký tên, ghi rõ họ tên</div></div>
+</div>
+<div class="footer">Báo cáo được tạo tự động bởi Quách Gia App — ${new Date().toLocaleString('vi-VN')}</div>
+<script>window.onload=function(){window.print()}<\/script>
+</body></html>`;
+
+    const w=window.open('','_blank','width=800,height=600');
+    if(w){w.document.write(pdfHtml);w.document.close()}
+    else{showToast('Popup bị chặn! Hãy cho phép popup.','error')}
+}
+
+function downloadShareholderPDF(shId){
+    const shs=gs(SK.shareholders)||[];
+    const sh=shs.find(s=>s.id===shId);
+    if(!sh){showToast('Không tìm thấy cổ đông','error');return}
+    const locks=getDividendLocks();
+    const entries=(gs(SK.benefitEntries)||[]).filter(e=>e.shareholderId===shId);
+    const isW=sh.type==='working';
+
+    // Dividend history
+    let divHtml='';let totalDiv=0,totalPaid=0;
+    locks.forEach(lock=>{
+        const div=calcLockDistributable(lock);
+        const myDiv=Math.round(div*sh.percent/100);
+        const shPaid=lock.shares?lock.shares.find(s=>s.shId===shId):null;
+        const isPaid=shPaid&&shPaid.paid;
+        totalDiv+=myDiv;
+        if(isPaid) totalPaid+=myDiv;
+        divHtml+=`<tr><td style="padding:6px 10px;border:1px solid #ddd;font-weight:600">T${lock.month}/${lock.year}</td>
+            <td style="text-align:right;padding:6px 10px;border:1px solid #ddd">${fmtNum(myDiv)}</td>
+            <td style="text-align:center;padding:6px 10px;border:1px solid #ddd">${isPaid?'✅ Đã chi':'⏳ Chưa'}</td>
+            <td style="text-align:center;padding:6px 10px;border:1px solid #ddd;font-size:10px">${isPaid&&shPaid.paidAt?new Date(shPaid.paidAt).toLocaleDateString('vi-VN'):'—'}</td></tr>`;
+    });
+
+    // Benefit history
+    let bfHtml='';let totalBf=0,totalBfRec=0;
+    entries.forEach(e=>{
+        totalBf+=e.amount||0;
+        if(e.status==='received') totalBfRec+=e.amount||0;
+        bfHtml+=`<tr><td style="padding:6px 10px;border:1px solid #ddd">${e.date||'—'}</td>
+            <td style="padding:6px 10px;border:1px solid #ddd">${e.catName||'—'}</td>
+            <td style="text-align:right;padding:6px 10px;border:1px solid #ddd">${fmtNum(e.amount||0)}</td>
+            <td style="text-align:center;padding:6px 10px;border:1px solid #ddd">${e.status==='received'?'✅ Đã nhận':'⏳ Chưa'}</td></tr>`;
+    });
+
+    const pdfHtml=`<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Báo cáo cổ đông ${sh.name} - Quách Gia</title>
+<style>
+@page{size:A4;margin:15mm}
+body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#333;line-height:1.5;padding:20px}
+h1{text-align:center;font-size:20px;color:#4f46e5;margin-bottom:4px}
+h2{font-size:14px;color:#4f46e5;margin:18px 0 8px;border-bottom:2px solid #4f46e5;padding-bottom:4px}
+.subtitle{text-align:center;font-size:12px;color:#666;margin-bottom:20px}
+table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11px}
+th{background:#4f46e5;color:#fff;padding:8px 10px;text-align:left;font-weight:600}
+td{padding:6px 10px;border:1px solid #ddd}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.info-card{padding:14px;border-radius:8px;border:1px solid #e0e0e0;background:#fafafa}
+.info-card .label{font-size:10px;color:#888;margin-bottom:4px}
+.info-card .val{font-size:16px;font-weight:800}
+.summary-bar{display:flex;justify-content:space-around;padding:12px;background:#f0f4ff;border-radius:8px;margin-bottom:14px}
+.summary-item{text-align:center}
+.summary-item .s-label{font-size:9px;color:#666}
+.summary-item .s-val{font-size:15px;font-weight:800;color:#4f46e5}
+.footer{margin-top:30px;text-align:center;font-size:10px;color:#999;border-top:1px solid #eee;padding-top:10px}
+.sign-area{display:flex;justify-content:space-around;margin-top:40px}
+.sign-box{text-align:center;min-width:150px}
+.sign-box .label{font-weight:600;margin-bottom:50px}
+.sign-box .line{border-top:1px solid #333;padding-top:4px;font-size:10px;color:#666}
+@media print{body{padding:0}button{display:none!important}}
+</style></head><body>
+<h1>BÁO CÁO CỔ ĐÔNG 股東報告</h1>
+<div class="subtitle">${sh.name} — QUÁCH GIA 郭家<br>Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}</div>
+
+<div class="info-grid">
+<div class="info-card"><div class="label">Tên cổ đông 股東姓名</div><div class="val">${sh.name}</div></div>
+<div class="info-card"><div class="label">Tỷ lệ lợi nhuận 利潤比例</div><div class="val" style="color:#4f46e5">${sh.percent}%</div></div>
+<div class="info-card"><div class="label">Loại hình 類型</div><div class="val">${isW?'Làm việc tại quán 在店工作':'Đầu tư 投資'}</div></div>
+<div class="info-card"><div class="label">${isW?'Lương cơ bản 基本薪資':'Vốn đầu tư 投資額'}</div><div class="val" style="color:${isW?'#8b5cf6':'#10b981'}">${fmtNum(isW?(sh.salary||0):(sh.investment||0))} ₫</div></div>
+</div>
+
+<div class="summary-bar">
+<div class="summary-item"><div class="s-label">Tổng lợi tức 分紅總額</div><div class="s-val">${fmtNum(totalDiv)} ₫</div></div>
+<div class="summary-item"><div class="s-label">Đã nhận LT 已領分紅</div><div class="s-val" style="color:#10b981">${fmtNum(totalPaid)} ₫</div></div>
+<div class="summary-item"><div class="s-label">Tổng phúc lợi 福利總額</div><div class="s-val" style="color:#f59e0b">${fmtNum(totalBf)} ₫</div></div>
+<div class="summary-item"><div class="s-label">PL đã nhận 已領福利</div><div class="s-val" style="color:#10b981">${fmtNum(totalBfRec)} ₫</div></div>
+</div>
+
+<h2>I. Lịch sử lợi tức 分紅歷史</h2>
+<table>
+<thead><tr><th>Kỳ 期間</th><th style="text-align:right">Lợi tức 分紅</th><th style="text-align:center">Trạng thái 狀態</th><th style="text-align:center">Ngày chi 付款日</th></tr></thead>
+<tbody>${divHtml||'<tr><td colspan="4" style="text-align:center;padding:12px;color:#999;border:1px solid #ddd">Chưa có dữ liệu</td></tr>'}</tbody>
+</table>
+
+<h2>II. Lịch sử phúc lợi 福利歷史</h2>
+<table>
+<thead><tr><th>Ngày 日期</th><th>Hạng mục 項目</th><th style="text-align:right">Số tiền 金額</th><th style="text-align:center">Trạng thái 狀態</th></tr></thead>
+<tbody>${bfHtml||'<tr><td colspan="4" style="text-align:center;padding:12px;color:#999;border:1px solid #ddd">Chưa có dữ liệu</td></tr>'}</tbody>
+</table>
+
+<div class="sign-area">
+<div class="sign-box"><div class="label">Người lập 制表人</div><div class="line">Ký tên, ghi rõ họ tên</div></div>
+<div class="sign-box"><div class="label">Cổ đông xác nhận 股東確認</div><div class="line">Ký tên, ghi rõ họ tên</div></div>
+</div>
+<div class="footer">Báo cáo được tạo tự động bởi Quách Gia App — ${new Date().toLocaleString('vi-VN')}</div>
+<script>window.onload=function(){window.print()}<\/script>
+</body></html>`;
+
+    const w=window.open('','_blank','width=800,height=600');
+    if(w){w.document.write(pdfHtml);w.document.close()}
+    else{showToast('Popup bị chặn! Hãy cho phép popup.','error')}
 }
 
 // ========== TỔNG QUAN 總覽 ==========
@@ -7165,7 +7944,7 @@ function buildBankTable(id,txns,title,color){
     html+='<div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Giờ</th><th>Nội dung</th><th style="text-align:right">Số tiền</th></tr></thead><tbody>';
     txns.forEach(function(t){
         var shortDesc=t.desc.length>80?t.desc.substring(0,80)+'...':t.desc;
-        html+='<tr><td style="white-space:nowrap">'+formatDateVN(t.date)+'</td><td>'+t.time+'</td><td style="font-size:10.5px;max-width:300px;word-break:break-all" title="'+escHtml(t.desc)+'">'+escHtml(shortDesc)+'</td><td style="text-align:right;font-weight:600;color:'+(t.isIncome?'var(--success)':'var(--danger)')+'">'+fmtNum(t.amount)+'</td></tr>';
+        html+='<tr><td style="white-space:nowrap">'+formatDateVN(t.date)+'</td><td>'+safeTime(t.time)+'</td><td style="font-size:10.5px;max-width:300px;word-break:break-all" title="'+escHtml(t.desc)+'">'+escHtml(shortDesc)+'</td><td style="text-align:right;font-weight:600;color:'+(t.isIncome?'var(--success)':'var(--danger)')+'">'+fmtNum(t.amount)+'</td></tr>';
     });
     html+='</tbody></table></div></div>';
     return html;
@@ -7237,7 +8016,7 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
             var detHtml='<td colspan="5" style="padding:8px;background:var(--bg-secondary);font-size:10.5px">';
             detHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
             detHtml+='<div><b style="color:var(--primary)">NH (KOV) 銀行:</b><br>';
-            if(kovByDate[d]){kovByDate[d].txns.forEach(function(t){detHtml+=formatDateVN(t.date)+' '+t.time+' — '+fmtNum(t.amount)+' — <span style="font-size:9px">'+escHtml(t.desc.substring(0,60))+'</span><br>'})}
+            if(kovByDate[d]){kovByDate[d].txns.forEach(function(t){detHtml+=formatDateVN(t.date)+' '+safeTime(t.time)+' — '+fmtNum(t.amount)+' — <span style="font-size:9px">'+escHtml(t.desc.substring(0,60))+'</span><br>'})}
             else detHtml+='<i>Không có 無</i>';
             detHtml+='</div><div><b style="color:var(--success)">App (CK) 系統:</b><br>';
             if(revTransferByDate[d]){revTransferByDate[d].records.forEach(function(r){detHtml+=formatDateVN(r.date)+' Ca'+r.shift+' — CK: '+fmtNum(r.transfer||0)+'<br>'})}
@@ -7295,7 +8074,7 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
             var gDetHtml='<td colspan="6" style="padding:8px;background:var(--bg-secondary);font-size:10.5px">';
             gDetHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
             gDetHtml+='<div><b style="color:#16a34a">NH (Grab) 銀行:</b><br>';
-            grabByBankDate[bankDate].txns.forEach(function(t){gDetHtml+=t.time+' — '+fmtNum(t.amount)+' — <span style="font-size:9px">'+escHtml(t.desc.substring(0,60))+'</span><br>'});
+            grabByBankDate[bankDate].txns.forEach(function(t){gDetHtml+=safeTime(t.time)+' — '+fmtNum(t.amount)+' — <span style="font-size:9px">'+escHtml(t.desc.substring(0,60))+'</span><br>'});
             gDetHtml+='</div><div><b style="color:var(--primary)">App (GrabNet) 系統:</b><br>';
             if(dayRevs.length>0){dayRevs.forEach(function(r){var gn=Number(r.grabNet!==undefined?r.grabNet:(r.grab||0))||0;gDetHtml+=formatDateVN(r.date)+' Ca'+r.shift+' — GrabNet: '+fmtNum(gn)+'<br>'})}
             else gDetHtml+='<i>Chưa có doanh thu 無營收資料</i>';
@@ -7357,7 +8136,7 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
             var expDetHtml='<td colspan="6" style="padding:8px;background:var(--bg-secondary);font-size:10.5px">';
             expDetHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
             expDetHtml+='<div><b style="color:var(--danger)">NH (ra) 銀行支出:</b><br>';
-            if(bankExpByDate[d]){bankExpByDate[d].txns.forEach(function(t){expDetHtml+=t.time+' — '+fmtNum(t.amount)+' — <span style="font-size:9px">'+escHtml(t.desc.substring(0,60))+'</span><br>'})}
+            if(bankExpByDate[d]){bankExpByDate[d].txns.forEach(function(t){expDetHtml+=safeTime(t.time)+' — '+fmtNum(t.amount)+' — <span style="font-size:9px">'+escHtml(t.desc.substring(0,60))+'</span><br>'})}
             else expDetHtml+='<i>Không có 無</i>';
             expDetHtml+='</div><div><b style="color:var(--primary)">App chi tiêu CK 系統支出:</b><br>';
             if(appExpByDate[d]){appExpByDate[d].records.forEach(function(e){
@@ -7367,7 +8146,9 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
                 expDetHtml+='<a onclick="editExpense(\''+e.id+'\')" style="color:var(--primary);cursor:pointer;font-weight:600;text-decoration:underline;font-size:10px" title="Bấm xem/sửa chi tiết 點擊查看">'+escHtml(codeStr)+'</a> <span style="color:var(--text-muted);font-size:9px">['+escHtml(catLabel)+']</span> '+escHtml(descShort)+' — '+fmtNum(e.amount)+'<br>';
             })}
             else expDetHtml+='<i>Không có 無</i>';
-            expDetHtml+='</div></div></td>';
+            expDetHtml+='</div></div>';
+            expDetHtml+='<div style="margin-top:6px;text-align:right"><button class="btn btn-sm" onclick="openReconcileAddExp(\''+d+'\')" style="font-size:10px;padding:4px 10px;background:var(--primary);color:#fff;border-radius:6px">➕ Thêm chi tiêu từ đây</button></div>';
+            expDetHtml+='</td>';
             html+='<tr id="expDetail-'+d+'" style="display:none">'+expDetHtml+'</tr>';
         }
     });
@@ -7384,6 +8165,20 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
 // Lịch sử điều chỉnh đối chiếu NH
 function getReconcileAdjustments(){return gs('qg_reconcile_adjustments')||[]}
 function saveReconcileAdjustment(adj){var list=getReconcileAdjustments();list.push(adj);ss('qg_reconcile_adjustments',list)}
+// Open add expense form from reconciliation mismatch
+function openReconcileAddExp(date){
+    // Navigate to chi tiêu tab and pre-fill the date
+    navigateTo('expense');
+    setTimeout(function(){
+        var dateEl=document.getElementById('expense-date');
+        if(dateEl)dateEl.value=date;
+        // Scroll to form
+        var form=document.querySelector('.expense-form-container');
+        if(form)form.scrollIntoView({behavior:'smooth',block:'start'});
+        showToast('📝 Nhập chi tiêu cho ngày '+formatDateVN(date));
+    },200);
+}
+
 
 // ========== ĐỐI CHIẾU ĐƠN (Order-level Reconciliation) ==========
 function showOrderReconcile(date){
@@ -7632,7 +8427,7 @@ function renderAdjustmentHistory(){
     var list=getReconcileAdjustments();
     if(list.length===0)return '';
     list.sort(function(a,b){return(b.adjustedAt||'').localeCompare(a.adjustedAt||'')});
-    var h='<div class="card" style="margin-top:14px"><h3 style="font-size:14px;margin-bottom:10px">📝 Lịch sử điều chỉnh đối chiếu 對帳調整記錄</h3>';
+    var h='<div class="card" style="margin-top:14px"><h3 style="font-size:14px;margin-bottom:10px">📝 Lịch sử điều chỉnh đối chiếu 對帳調整記錄 ('+list.length+')</h3><div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">';
     h+='<div class="table-wrap"><table><thead><tr><th>Thời gian 時間</th><th>Loại 類型</th><th>Ngày DT 營收日</th><th>Ca 班</th><th style="text-align:right">Cũ 原值</th><th style="text-align:right">Chênh lệch 差額</th><th style="text-align:right">Mới 新值</th><th>Người 操作者</th></tr></thead><tbody>';
     list.forEach(function(a){
         var typeLabel=a.type==='ck'?'💳 CK':'🛵 Grab';
@@ -7649,7 +8444,7 @@ function renderAdjustmentHistory(){
         h+='<td style="font-size:10.5px">'+escHtml(a.adjustedBy||'')+'</td>';
         h+='</tr>';
     });
-    h+='</tbody></table></div></div>';
+    h+='</tbody></table></div></div></div>';
     return h;
 }
 
@@ -8236,7 +9031,7 @@ function renderBankDetail(txns,init){
         var descShort=t.desc.length>40?t.desc.substring(0,40)+'...':t.desc;
         h+='<tr>';
         h+='<td style="white-space:nowrap;font-size:11px">'+formatDateVN(t.date)+'</td>';
-        h+='<td style="font-size:10.5px">'+escHtml(t.time||'')+'</td>';
+        h+='<td style="font-size:10.5px">'+escHtml((function(tm){if(!tm)return'';var m=String(tm).match(/(\d{1,2}:\d{2}(:\d{2})?)/);return m?m[1]:String(tm).substring(0,8)})(t.time))+'</td>';
         var safeId=String(t.txnId||'').replace(/'/g,"\\'");
         h+='<td style="font-size:11px;cursor:pointer;text-decoration:underline dotted" title="'+escHtml(t.desc)+'" onclick="showBankTxnDetail(\''+safeId+'\')">'+escHtml(descShort)+'</td>';
         h+='<td style="font-size:10.5px">'+catLabel+'</td>';
@@ -8262,7 +9057,7 @@ function showBankTxnDetail(txnId){
     if(!t){showToast('Không tìm thấy giao dịch','warning');return}
     var msg='📄 Chi tiết giao dịch ngân hàng\n\n';
     msg+='Ngày: '+formatDateVN(t.date)+'\n';
-    msg+='Giờ: '+(t.time||'—')+'\n';
+    msg+='Giờ: '+safeTime(t.time||'—')+'\n';
     msg+='Loại: '+(t.isIncome?'Tiền vào':'Tiền ra')+'\n';
     msg+='Số tiền: '+(t.isIncome?'+':'-')+fmtNum(t.amount)+'\n';
     msg+='Mã GD: '+(t.txnId||'—')+'\n\n';
@@ -8315,7 +9110,7 @@ function renderBankInCK(income){
         h+='<div class="table-wrap"><table><thead><tr><th>Ngày</th><th>Giờ</th><th>Nội dung</th><th style="text-align:right">Số tiền</th></tr></thead><tbody>';
         otherTxns.forEach(function(t){
             var descShort=t.desc.length>50?t.desc.substring(0,50)+'...':t.desc;
-            h+='<tr><td>'+formatDateVN(t.date)+'</td><td>'+escHtml(t.time||'')+'</td><td style="font-size:11px" title="'+escHtml(t.desc)+'">'+escHtml(descShort)+'</td><td style="text-align:right;color:var(--success);font-weight:600">+'+fmtNum(t.amount)+'</td></tr>';
+            h+='<tr><td>'+formatDateVN(t.date)+'</td><td>'+safeTime(t.time)+'</td><td style="font-size:11px" title="'+escHtml(t.desc)+'">'+escHtml(descShort)+'</td><td style="text-align:right;color:var(--success);font-weight:600">+'+fmtNum(t.amount)+'</td></tr>';
         });
         h+='</tbody></table></div>';
     }
@@ -8362,7 +9157,7 @@ function renderBankInGrab(income){
         h+='<div class="table-wrap"><table><thead><tr><th>Ngày NH</th><th>Giờ</th><th>Nội dung</th><th style="text-align:right">Số tiền</th></tr></thead><tbody>';
         grabTxns.forEach(function(t){
             var descShort=t.desc.length>50?t.desc.substring(0,50)+'...':t.desc;
-            h+='<tr><td>'+formatDateVN(t.date)+'</td><td>'+escHtml(t.time||'')+'</td><td style="font-size:11px" title="'+escHtml(t.desc)+'">'+escHtml(descShort)+'</td><td style="text-align:right;color:var(--success);font-weight:600">+'+fmtNum(t.amount)+'</td></tr>';
+            h+='<tr><td>'+formatDateVN(t.date)+'</td><td>'+safeTime(t.time)+'</td><td style="font-size:11px" title="'+escHtml(t.desc)+'">'+escHtml(descShort)+'</td><td style="text-align:right;color:var(--success);font-weight:600">+'+fmtNum(t.amount)+'</td></tr>';
         });
         h+='</tbody></table></div>';
     }else{
@@ -8469,7 +9264,7 @@ function renderBankOut(expense){
             var descShort=t.desc.length>35?t.desc.substring(0,35)+'...':t.desc;
             h+='<tr>';
             h+='<td style="white-space:nowrap;font-size:11px">'+formatDateVN(t.date)+'</td>';
-            h+='<td style="font-size:10.5px">'+escHtml(t.time||'')+'</td>';
+            h+='<td style="font-size:10.5px">'+safeTime(t.time)+'</td>';
             h+='<td style="font-size:11px;cursor:pointer;text-decoration:underline dotted;color:var(--primary)" onclick="showBankTxnDetail(\''+String(t.txnId||'').replace(/'/g,"\\'")+'\')" title="Bấm để xem nội dung đầy đủ">'+escHtml(descShort)+'</td>';
             h+='<td style="font-size:10.5px">'+u.guessLabel+'</td>';
             h+='<td style="text-align:right;color:var(--danger);font-weight:600">-'+fmtNum(t.amount)+'</td>';
