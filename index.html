@@ -7893,7 +7893,7 @@ function renderBankReconcile(txns){
     // Build reconciliation data
     var reconcileData=buildReconciliation(kovTxns,grabTxns,expense,minDate,maxDate);
     // Store stats for saving
-    _lastReconcileStats={minDate:minDate,maxDate:maxDate,totalIn:totalIn,totalOut:totalOut,kovBank:totalKov,kovApp:reconcileData.kovApp||0,kovDiff:reconcileData.kovDiff||0,grabBank:totalGrab,grabApp:reconcileData.grabApp||0,grabDiff:reconcileData.grabDiff||0,expBank:reconcileData.expBank||0,expApp:reconcileData.expApp||0,expDiff:reconcileData.expDiff||0};
+    _lastReconcileStats={minDate:minDate,maxDate:maxDate,totalIn:totalIn,totalOut:totalOut,kovBank:totalKov,kovApp:reconcileData.kovApp||0,kovDiff:reconcileData.kovDiff||0,grabBank:totalGrab,grabApp:reconcileData.grabApp||0,grabDiff:reconcileData.grabDiff||0,expBank:reconcileData.expBank||0,expApp:reconcileData.expApp||0,expDiff:reconcileData.expDiff||0,revCash:reconcileData.revCash||0,revTotal:reconcileData.revTotal||0};
     var html='';
     // ===== SUMMARY CARDS =====
     html+='<div class="card" style="margin-top:14px">';
@@ -7956,6 +7956,7 @@ function formatDateVN(d){
     if(p.length===3)return p[2]+'/'+p[1]+'/'+p[0];
     return d;
 }
+function safeTime(t){if(!t)return'';var s=String(t);if(s.length>8)s=s.substring(0,8);return s}
 
 function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
     var html='';
@@ -7971,6 +7972,66 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
     var dateMinPrev=subtractDay(dateMin);
     var filteredRevs=revs.filter(function(r){return r.date>=dateMinPrev&&r.date<=dateMax});
     var filteredExps=exps.filter(function(r){return r.date>=dateMin&&r.date<=dateMax});
+    // ====== REVENUE SUMMARY (Doanh thu tổng hợp) ======
+    var totalAppCash=0,totalAppCK=0,totalAppGrab=0;
+    filteredRevs.forEach(function(r){
+        if(r.date>=dateMin&&r.date<=dateMax){
+            totalAppCash+=Number(r.cash)||0;
+            totalAppCK+=Number(r.transfer)||0;
+            var gn=Number(r.grabNet!==undefined?r.grabNet:(r.grab||0))||0;
+            totalAppGrab+=gn;
+        }
+    });
+    var totalAppRevenue=totalAppCash+totalAppCK+totalAppGrab;
+    var totalBankKov=kovTxns.reduce(function(s,t){return s+t.amount},0);
+    var totalBankGrab=grabTxns.reduce(function(s,t){return s+t.amount},0);
+    var totalBankOther=0;
+    // otherIncome not passed directly, calculate from income - kov - grab
+    var allIncomeTxns=[].concat(kovTxns,grabTxns);
+    var totalBankIn=totalBankKov+totalBankGrab;
+    var totalAppExp=0;
+    filteredExps.forEach(function(e){
+        var pm=e.payMethod||'';
+        if(pm==='transfer'||pm==='Chuyển khoản')totalAppExp+=Number(e.amount)||0;
+    });
+    var totalBankExp=expenseTxns.reduce(function(s,t){return s+t.amount},0);
+    html+='<div class="card" style="margin-top:14px">';
+    html+='<h3 style="font-size:15px;margin-bottom:12px">📊 Đối chiếu Doanh thu tổng hợp 營收總對帳</h3>';
+    html+='<div class="table-wrap"><table><thead><tr><th>Khoản mục 項目</th><th style="text-align:right">App (hệ thống) 系統</th><th style="text-align:right">NH (ngân hàng) 銀行</th><th style="text-align:right">Chênh lệch 差額</th><th>Trạng thái 狀態</th></tr></thead><tbody>';
+    // CK row
+    var ckDiff=totalBankKov-totalAppCK;
+    html+='<tr><td>💳 Chuyển khoản (CK/KOV)</td><td style="text-align:right">'+fmtNum(totalAppCK)+'</td><td style="text-align:right">'+fmtNum(totalBankKov)+'</td><td style="text-align:right;font-weight:600;color:'+(Math.abs(ckDiff)<=1000?'var(--success)':'var(--danger)')+'">'+fmtNum(ckDiff)+'</td><td>'+(Math.abs(ckDiff)<=1000?'✅ Khớp':'⚠️ Lệch')+'</td></tr>';
+    // Grab row
+    var grDiff=totalBankGrab-totalAppGrab;
+    html+='<tr><td>🛵 Grab (lệch 1 ngày)</td><td style="text-align:right">'+fmtNum(totalAppGrab)+'</td><td style="text-align:right">'+fmtNum(totalBankGrab)+'</td><td style="text-align:right;font-weight:600;color:'+(Math.abs(grDiff)<=1000?'var(--success)':'var(--danger)')+'">'+fmtNum(grDiff)+'</td><td>'+(Math.abs(grDiff)<=1000?'✅ Khớp':'⚠️ Lệch')+'</td></tr>';
+    // Total CK+Grab row
+    var totalNonCash=totalAppCK+totalAppGrab;
+    var totalBankInAll=totalBankKov+totalBankGrab;
+    var nonCashDiff=totalBankInAll-totalNonCash;
+    html+='<tr style="font-weight:700;background:var(--bg-secondary)"><td>📊 Tổng DT qua NH (CK+Grab)</td><td style="text-align:right">'+fmtNum(totalNonCash)+'</td><td style="text-align:right">'+fmtNum(totalBankInAll)+'</td><td style="text-align:right;color:'+(Math.abs(nonCashDiff)<=1000?'var(--success)':'var(--danger)')+'">'+fmtNum(nonCashDiff)+'</td><td>'+(Math.abs(nonCashDiff)<=1000?'✅ Khớp':'⚠️ Lệch')+'</td></tr>';
+    // Cash row (info only)
+    html+='<tr style="color:var(--text-muted)"><td>💵 Tiền mặt (không qua NH)</td><td style="text-align:right">'+fmtNum(totalAppCash)+'</td><td style="text-align:right;font-style:italic">—</td><td style="text-align:right;font-style:italic">—</td><td style="font-size:10px">ℹ️ Không qua NH</td></tr>';
+    // Total revenue row
+    html+='<tr style="font-weight:700;border-top:2px solid var(--border)"><td>💰 TỔNG DOANH THU 總營收</td><td style="text-align:right;color:var(--success)">'+fmtNum(totalAppRevenue)+'</td><td style="text-align:right">'+fmtNum(totalBankInAll)+'</td><td colspan="2" style="font-size:10.5px;color:var(--text-muted)">DT qua NH chiếm '+(totalAppRevenue>0?Math.round(totalNonCash/totalAppRevenue*100):0)+'%</td></tr>';
+    // Expense CK row
+    var expDiff2=totalBankExp-totalAppExp;
+    html+='<tr style="border-top:1.5px solid var(--border)"><td>📤 Chi tiêu CK (tiền ra)</td><td style="text-align:right;color:var(--danger)">'+fmtNum(totalAppExp)+'</td><td style="text-align:right;color:var(--danger)">'+fmtNum(totalBankExp)+'</td><td style="text-align:right;font-weight:600;color:'+(Math.abs(expDiff2)<=1000?'var(--success)':'var(--danger)')+'">'+fmtNum(expDiff2)+'</td><td>'+(Math.abs(expDiff2)<=1000?'✅ Khớp':'⚠️ Lệch')+'</td></tr>';
+    html+='</tbody></table></div>';
+    html+='<div style="margin-top:8px;font-size:10.5px;color:var(--text-muted);line-height:1.5">💡 Xem chi tiết từng ngày ở các bảng bên dưới: <b>Đối chiếu Đơn</b>, <b>Đối chiếu TIỀN VÀO</b> (CK + Grab) và <b>Đối chiếu TIỀN RA</b> (Chi tiêu CK)</div>';
+    html+='</div>';
+
+    // ====== ORDER RECONCILIATION (Đối chiếu Đơn hàng) ======
+    html+='<div class="card" style="margin-top:14px">';
+    html+='<h3 style="font-size:15px;margin-bottom:12px">🧾 Đối chiếu Đơn hàng 訂單對帳</h3>';
+    html+='<p style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Paste danh sách đơn CK từ KiotViet → hệ thống tự khớp với giao dịch NH theo số tiền</p>';
+    html+='<textarea id="kvOrderInput" placeholder="Paste đơn CK từ KiotViet vào đây...\nVD:\nHD003291\n12/06/2026 21:29\nKhách lẻ\n519,750\t0\t519,750\t0\n519,750\nĐã phát hành\n3058" style="width:100%;height:100px;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-family:monospace;resize:vertical"></textarea>';
+    html+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+    html+='<button onclick="runFullOrderMatch()" class="btn btn-primary" style="padding:8px 18px;font-size:12px;font-weight:600">📊 Phân tích đối chiếu đơn 分析訂單對帳</button>';
+    html+='<span style="font-size:10px;color:var(--text-muted)">Khớp tất cả đơn KiotViet với giao dịch KOV ngân hàng trong kỳ sao kê</span>';
+    html+='</div>';
+    html+='<div id="fullOrderMatchResult" style="margin-top:12px"></div>';
+    html+='</div>';
+
     // ====== CK RECONCILIATION (KOV vs Chuyển khoản doanh thu) ======
     html+='<div class="card" style="margin-top:14px">';
     html+='<h3 style="font-size:15px;margin-bottom:12px">🔍 Đối chiếu TIỀN VÀO 收入對賬</h3>';
@@ -8158,7 +8219,7 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
     html+='</div>';
     // Lịch sử điều chỉnh
     html+=renderAdjustmentHistory();
-    return {html:html,kovApp:totalCkApp,kovDiff:totalCkDiff,grabApp:totalGrabApp,grabDiff:totalGrabDiff,expBank:totalExpBank,expApp:totalExpApp,expDiff:totalExpDiff};
+    return {html:html,kovApp:totalCkApp,kovDiff:totalCkDiff,grabApp:totalGrabApp,grabDiff:totalGrabDiff,expBank:totalExpBank,expApp:totalExpApp,expDiff:totalExpDiff,revCash:totalAppCash,revTotal:totalAppRevenue};
 }
 
 // ========== APPLY BANK AMOUNT 套用銀行金額 ==========
@@ -8323,6 +8384,92 @@ function runOrderMatch(date){
     }
     resultEl.innerHTML=html;
     showToast('Đã phân tích '+invoices.length+' đơn KiotViet vs '+kovTxns.length+' GD ngân hàng','success');
+}
+
+// ========== FULL ORDER MATCH (all dates in statement period) ==========
+function runFullOrderMatch(){
+    var ta=document.getElementById('kvOrderInput');
+    var resultEl=document.getElementById('fullOrderMatchResult');
+    if(!ta||!resultEl)return;
+    var raw=ta.value.trim();
+    if(!raw){showToast('Vui lòng paste đơn KiotViet 請貼上KiotViet訂單','warning');return}
+    var invoices=parseKiotVietData(raw);
+    if(invoices.length===0){showToast('Không tìm thấy đơn hàng nào. Kiểm tra format. 找不到訂單','error');return}
+    // Get ALL KOV bank transactions from last parse
+    var kovTxns=(_lastBankTxns||[]).filter(function(t){return t.isIncome&&t.category==='kov'});
+    if(kovTxns.length===0){showToast('Chưa có giao dịch KOV từ sao kê. Hãy phân tích sao kê trước. 請先分析銀行對帳單','warning');return}
+    // Match by amount (exact ±1đ)
+    var usedBank={};
+    var usedInv={};
+    var matched=[];
+    invoices.forEach(function(inv,iIdx){
+        for(var b=0;b<kovTxns.length;b++){
+            if(usedBank[b])continue;
+            // Try date+amount match first
+            if(kovTxns[b].date===inv.date&&Math.abs(kovTxns[b].amount-inv.amount)<=1){
+                matched.push({bank:kovTxns[b],inv:inv});
+                usedBank[b]=true;usedInv[iIdx]=true;break;
+            }
+        }
+    });
+    // Second pass: amount-only match for remaining
+    invoices.forEach(function(inv,iIdx){
+        if(usedInv[iIdx])return;
+        for(var b=0;b<kovTxns.length;b++){
+            if(usedBank[b])continue;
+            if(Math.abs(kovTxns[b].amount-inv.amount)<=1){
+                matched.push({bank:kovTxns[b],inv:inv});
+                usedBank[b]=true;usedInv[iIdx]=true;break;
+            }
+        }
+    });
+    var bankOnly=kovTxns.filter(function(t,i){return !usedBank[i]});
+    var invOnly=invoices.filter(function(inv,i){return !usedInv[i]});
+    var totalMatched=matched.reduce(function(s,m){return s+m.bank.amount},0);
+    var totalBankOnly=bankOnly.reduce(function(s,t){return s+t.amount},0);
+    var totalInvOnly=invOnly.reduce(function(s,t){return s+t.amount},0);
+    // Build result
+    var h='';
+    // KPI cards
+    h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:12px">';
+    h+='<div style="background:var(--success-light);padding:10px;border-radius:8px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">✅ KHỚP 已對</div><div style="font-size:16px;font-weight:700;color:var(--success)">'+matched.length+'</div><div style="font-size:10px">'+fmtNum(totalMatched)+'</div></div>';
+    h+='<div style="background:var(--warning-light);padding:10px;border-radius:8px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">⚠️ NH DƯ 銀行多</div><div style="font-size:16px;font-weight:700;color:var(--warning)">'+bankOnly.length+'</div><div style="font-size:10px">'+fmtNum(totalBankOnly)+'</div></div>';
+    h+='<div style="background:var(--danger-light);padding:10px;border-radius:8px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">❌ THIẾU NH 銀行缺</div><div style="font-size:16px;font-weight:700;color:var(--danger)">'+invOnly.length+'</div><div style="font-size:10px">'+fmtNum(totalInvOnly)+'</div></div>';
+    h+='<div style="background:var(--primary-light);padding:10px;border-radius:8px;text-align:center"><div style="font-size:10px;color:var(--text-muted)">📊 TỔNG ĐƠN KV 總訂單</div><div style="font-size:16px;font-weight:700;color:var(--primary)">'+invoices.length+'</div><div style="font-size:10px">'+fmtNum(invoices.reduce(function(s,i){return s+i.amount},0))+'</div></div>';
+    h+='</div>';
+    // Matched table
+    if(matched.length>0){
+        h+='<details open style="margin-bottom:10px"><summary style="font-size:12px;color:var(--success);font-weight:600;cursor:pointer;margin-bottom:6px">✅ Đã khớp ('+matched.length+') 已對帳 — '+fmtNum(totalMatched)+'</summary>';
+        h+='<div class="table-wrap" style="max-height:250px;overflow-y:auto"><table><thead><tr><th>Mã HĐ</th><th>Ngày</th><th>Giờ KV</th><th>Giờ NH</th><th style="text-align:right">Số tiền</th><th>Mã GD NH</th></tr></thead><tbody>';
+        matched.forEach(function(m){
+            h+='<tr style="background:rgba(16,185,129,0.04)"><td style="font-size:11px;font-weight:600">'+m.inv.code+'</td><td style="font-size:10px">'+formatDateVN(m.bank.date)+'</td><td style="font-size:10.5px">'+safeTime(m.inv.time)+'</td><td style="font-size:10.5px">'+safeTime(m.bank.time)+'</td><td style="text-align:right;font-weight:600;color:var(--success)">'+fmtNum(m.bank.amount)+'</td><td style="font-size:9px;color:var(--text-muted)">'+escHtml(m.bank.txnId||'').substring(0,18)+'</td></tr>';
+        });
+        h+='</tbody></table></div></details>';
+    }
+    // Bank only
+    if(bankOnly.length>0){
+        h+='<details style="margin-bottom:10px"><summary style="font-size:12px;color:var(--warning);font-weight:600;cursor:pointer;margin-bottom:6px">⚠️ NH dư — không khớp đơn KV ('+bankOnly.length+') 銀行多 — '+fmtNum(totalBankOnly)+'</summary>';
+        h+='<div class="table-wrap" style="max-height:200px;overflow-y:auto"><table><thead><tr><th>Ngày</th><th>Giờ</th><th>Nội dung</th><th style="text-align:right">Số tiền</th></tr></thead><tbody>';
+        bankOnly.forEach(function(t){
+            var ds=t.desc.length>50?t.desc.substring(0,50)+'...':t.desc;
+            h+='<tr style="background:rgba(245,158,11,0.06)"><td>'+formatDateVN(t.date)+'</td><td>'+safeTime(t.time)+'</td><td style="font-size:10.5px" title="'+escHtml(t.desc)+'">'+escHtml(ds)+'</td><td style="text-align:right;font-weight:600;color:var(--warning)">'+fmtNum(t.amount)+'</td></tr>';
+        });
+        h+='</tbody></table></div></details>';
+    }
+    // Invoice only
+    if(invOnly.length>0){
+        h+='<details style="margin-bottom:10px"><summary style="font-size:12px;color:var(--danger);font-weight:600;cursor:pointer;margin-bottom:6px">❌ Thiếu NH — có đơn KV nhưng không thấy trong NH ('+invOnly.length+') 銀行缺 — '+fmtNum(totalInvOnly)+'</summary>';
+        h+='<div class="table-wrap" style="max-height:200px;overflow-y:auto"><table><thead><tr><th>Mã HĐ</th><th>Ngày</th><th>Giờ</th><th style="text-align:right">Số tiền</th></tr></thead><tbody>';
+        invOnly.forEach(function(inv){
+            h+='<tr style="background:rgba(239,68,68,0.06)"><td style="font-weight:600">'+inv.code+'</td><td>'+formatDateVN(inv.date)+'</td><td>'+safeTime(inv.time)+'</td><td style="text-align:right;font-weight:600;color:var(--danger)">'+fmtNum(inv.amount)+'</td></tr>';
+        });
+        h+='</tbody></table></div></details>';
+    }
+    if(matched.length===invoices.length&&bankOnly.length===0){
+        h+='<div style="text-align:center;padding:12px;background:var(--success-light);border-radius:8px;font-size:13px;color:var(--success);font-weight:600">✅ Tất cả đơn đã khớp! 全部對帳成功！</div>';
+    }
+    resultEl.innerHTML=h;
+    showToast('Đã phân tích '+invoices.length+' đơn KiotViet vs '+kovTxns.length+' GD KOV ngân hàng 已分析訂單對帳','success');
 }
 
 function applyBankAmount(type,date,bankAmount){
@@ -8688,7 +8835,7 @@ function renderReconcileHistory(data){
         detailMap[r.reconcileId].push(r);
     });
     window._reconcileDetailMap=detailMap;
-    var html='<h3 style="font-size:14px;margin-bottom:10px">📋 Lịch sử đối chiếu</h3>';
+    var html='<h3 style="font-size:14px;margin-bottom:10px">📋 Lịch sử đối chiếu</h3><div style="max-height:400px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">';
     html+='<div class="table-wrap"><table><thead><tr><th>Ngày ĐC</th><th>Kỳ sao kê</th><th style="text-align:right">Vào</th><th style="text-align:right">Ra</th><th style="text-align:center">KOV</th><th style="text-align:center">Grab</th><th style="text-align:center">Chi CK</th><th>TT</th><th>Người</th><th></th></tr></thead><tbody>';
     summaries.forEach(function(s){
         var statusIcon=s.status==='Khớp'?'✅':'⚠️';
@@ -8710,7 +8857,7 @@ function renderReconcileHistory(data){
         html+='<div id="rcDetailContent-'+s.reconcileId+'"></div>';
         html+='</td></tr>';
     });
-    html+='</tbody></table></div>';
+    html+='</tbody></table></div></div>';
     container.innerHTML=html;
 }
 
