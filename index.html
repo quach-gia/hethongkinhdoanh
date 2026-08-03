@@ -337,7 +337,7 @@
                 <div id="expenseFormContent" style="padding:16px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
                         <div style="display:flex;gap:8px;align-items:center">
-                            <div class="ei-field" style="margin:0"><input type="date" id="expense-date" style="padding:7px 10px;font-size:13px"></div>
+                            <div class="ei-field" style="margin:0"><input type="date" id="expense-date" onchange="warnExpenseDate()" style="padding:7px 10px;font-size:13px"></div>
                             <div class="ei-field" style="margin:0">
                                 <select id="expense-shift" style="padding:7px 10px;font-size:13px">
                                     <option value="1">Ca 1</option><option value="2">Ca 2</option><option value="3">Ca 3</option>
@@ -1843,6 +1843,17 @@ function toggleSidebar(){document.getElementById('sidebar').classList.toggle('mo
 function fmt(n){if(!n&&n!==0)return'0 ₫';return new Intl.NumberFormat('vi-VN').format(Math.round(n))+' ₫'}
 function fmtNum(n){if(!n&&n!==0)return'0';return new Intl.NumberFormat('vi-VN').format(Math.round(n))}
 function parseMoney(s){return Number(String(s).replace(/[^\d\-]/g,''))||0}
+function checkExpenseDate(dateStr){
+    if(!dateStr)return'';
+    var today=todayVN();
+    var d=new Date(dateStr+'T00:00:00+07:00');
+    var t=new Date(today+'T00:00:00+07:00');
+    var diffMs=d.getTime()-t.getTime();
+    var diffDays=Math.round(diffMs/86400000);
+    if(diffDays>0)return'\u26a0\ufe0f Ngày chi tiêu là TƯƠNG LAI ('+formatDateVN(dateStr)+'), cách hôm nay '+diffDays+' ngày.\n日期是未來的日期！\n\nBạn có chắc chắn muốn lưu?';
+    if(diffDays<-3)return'\u26a0\ufe0f Ngày chi tiêu ('+formatDateVN(dateStr)+') cách hôm nay '+Math.abs(diffDays)+' ngày.\n日期距今'+Math.abs(diffDays)+'天！\n\nBạn có chắc chắn muốn lưu?';
+    return'';
+}
 
 // ========== TRANSLATE VI↔ZH (Google Translate API via Apps Script) ==========
 const viZhMap={
@@ -1903,6 +1914,15 @@ function cloudTranslate(text,fromLang,toLang,targetElId){
 
 // ========== EXPENSE FORM (single card) ==========
 let expItemId=0;
+function warnExpenseDate(){
+    var el=document.getElementById('expense-date');
+    if(!el||!el.value)return;
+    var warn=checkExpenseDate(el.value);
+    var warnEl=document.getElementById('expDateWarning');
+    if(!warnEl){warnEl=document.createElement('div');warnEl.id='expDateWarning';warnEl.style.cssText='font-size:11px;margin-top:4px;padding:4px 8px;border-radius:6px;font-weight:600';el.parentNode.appendChild(warnEl)}
+    if(warn){warnEl.style.display='block';warnEl.style.background='#fef3c7';warnEl.style.color='#92400e';warnEl.innerHTML='⚠️ Ngày bất thường! '+formatDateVN(el.value)}
+    else{warnEl.style.display='none'}
+}
 function initExpenseForm(){
     document.getElementById('expenseItems').innerHTML='';
     expItemId=0;
@@ -2230,6 +2250,8 @@ function saveExpenses(){
     const date=document.getElementById('expense-date').value;
     const shift=document.getElementById('expense-shift').value;
     if(!date){alert('Vui lòng chọn ngày!');return}
+    var dateWarn=checkExpenseDate(date);
+    if(dateWarn&&!confirm(dateWarn))return;
     const expenses=gs(SK.expenses)||[];
     let count=0;
     const now=new Date();
@@ -2364,7 +2386,7 @@ function renderExpenseSummary(){
         var catEsc=escHtml(e.category||'').replace(/'/g,"\\'");
         var createdNote='';
         if(e.createdAt){var ca=e.createdAt.replace('T',' ').slice(0,16);createdNote='<div style="font-size:9px;color:#9ca3af;margin-top:1px" title="Nhập lúc 輸入時間: '+ca+'">✎ '+ca.slice(5)+'</div>'}
-        rows.push('<tr class="'+rowClass+'" data-id="'+e.id+'"><td><input type="checkbox" class="exp-check" data-id="'+e.id+'" onchange="updateBatchBar()"></td><td>'+(idx+1)+'</td><td style="font-size:11px;color:var(--danger);font-weight:600">CT-'+String(e.id).slice(-4)+'</td><td style="font-size:12px;line-height:1.3;cursor:pointer" onclick="showDayReview(\''+e.date+'\')"><span style="color:var(--primary);text-decoration:underline dotted">'+formatDateVN(e.date)+'</span><br><span style="color:var(--text-muted)">'+(e.timeStr||'')+'</span>'+createdNote+'</td><td style="overflow:hidden;text-overflow:ellipsis"><span class="badge badge-info" style="font-size:10px;padding:2px 6px;cursor:pointer" onclick="showCatDetail(\''+catEsc+'\')">'+escHtml(e.category||'')+'</span></td><td style="overflow:hidden;text-overflow:ellipsis">'+escHtml(e.detailVi||'')+zhLine+advNote+'</td><td class="text-right amount-display" style="font-weight:700">'+fmtNum(e.amount)+'</td><td style="font-size:11px;font-weight:600;text-align:center">'+payMethodText+'</td><td><span class="badge '+(stBadge[e.status]||'badge-warning')+'" style="font-size:10px;padding:2px 7px">'+(stLabel[e.status]||e.status)+'</span></td><td class="text-center"><input type="checkbox" '+(e.invoice?'checked':'')+' onchange="toggleExpField(\''+e.id+'\',\'invoice\',this.checked)" '+(confirmed&&!isBoss?'disabled':'')+'></td><td class="text-center"><input type="checkbox" '+(e.vat?'checked':'')+' onchange="toggleExpField(\''+e.id+'\',\'vat\',this.checked)" '+(confirmed&&!isBoss?'disabled':'')+'></td><td style="font-size:12px;overflow:hidden;text-overflow:ellipsis">'+escHtml(e.displayName||e.user||'')+'</td><td class="text-center">'+(isBoss?'<button class="btn-xs '+(confirmed?'btn-success':'btn-outline')+'" onclick="toggleConfirm(\''+e.id+'\')" style="font-size:10px;padding:3px 6px">'+(confirmed?'✓':'Xác nhận')+'</button>':(confirmed?'<span style="color:var(--success)">✓</span>':''))+'</td><td class="edit-actions" style="white-space:nowrap">'+(!confirmed||isBoss?'<button class="btn-ghost btn-xs" onclick="editExpense(\''+e.id+'\')" title="Sửa" style="padding:2px 4px">✏️</button><button class="btn-ghost btn-xs" onclick="deleteExpense(\''+e.id+'\')" title="Xóa" style="color:var(--danger);padding:2px 4px">🗑️</button>':'')+'</td></tr>');
+        rows.push('<tr class="'+rowClass+'" data-id="'+e.id+'"><td><input type="checkbox" class="exp-check" data-id="'+e.id+'" onchange="updateBatchBar()"></td><td>'+(idx+1)+'</td><td style="font-size:11px;color:var(--danger);font-weight:600;cursor:pointer;text-decoration:underline dotted" onclick="event.stopPropagation();showExpenseHistory(\''+e.id+'\')" title="Xem lịch sử 查看歷史">CT-'+String(e.id).slice(-4)+(e.editHistory&&e.editHistory.length?'<div style=\\"font-size:8px;color:var(--warning);font-weight:400\\">✎×'+e.editHistory.length+'</div>':'')+'</td><td style="font-size:12px;line-height:1.3;cursor:pointer" onclick="showDayReview(\''+e.date+'\')"><span style="color:var(--primary);text-decoration:underline dotted">'+formatDateVN(e.date)+'</span><br><span style="color:var(--text-muted)">'+(e.timeStr||'')+'</span>'+createdNote+'</td><td style="overflow:hidden;text-overflow:ellipsis"><span class="badge badge-info" style="font-size:10px;padding:2px 6px;cursor:pointer" onclick="showCatDetail(\''+catEsc+'\')">'+escHtml(e.category||'')+'</span></td><td style="overflow:hidden;text-overflow:ellipsis">'+escHtml(e.detailVi||'')+zhLine+advNote+'</td><td class="text-right amount-display" style="font-weight:700">'+fmtNum(e.amount)+'</td><td style="font-size:11px;font-weight:600;text-align:center">'+payMethodText+'</td><td><span class="badge '+(stBadge[e.status]||'badge-warning')+'" style="font-size:10px;padding:2px 7px">'+(stLabel[e.status]||e.status)+'</span></td><td class="text-center"><input type="checkbox" '+(e.invoice?'checked':'')+' onchange="toggleExpField(\''+e.id+'\',\'invoice\',this.checked)" '+(confirmed&&!isBoss?'disabled':'')+'></td><td class="text-center"><input type="checkbox" '+(e.vat?'checked':'')+' onchange="toggleExpField(\''+e.id+'\',\'vat\',this.checked)" '+(confirmed&&!isBoss?'disabled':'')+'></td><td style="font-size:12px;overflow:hidden;text-overflow:ellipsis">'+escHtml(e.displayName||e.user||'')+'</td><td class="text-center">'+(isBoss?'<button class="btn-xs '+(confirmed?'btn-success':'btn-outline')+'" onclick="toggleConfirm(\''+e.id+'\')" style="font-size:10px;padding:3px 6px">'+(confirmed?'✓':'Xác nhận')+'</button>':(confirmed?'<span style="color:var(--success)">✓</span>':''))+'</td><td class="edit-actions" style="white-space:nowrap">'+(!confirmed||isBoss?'<button class="btn-ghost btn-xs" onclick="editExpense(\''+e.id+'\')" title="Sửa" style="padding:2px 4px">✏️</button><button class="btn-ghost btn-xs" onclick="deleteExpense(\''+e.id+'\')" title="Xóa" style="color:var(--danger);padding:2px 4px">🗑️</button>':'')+'</td></tr>');
     }
     document.getElementById('expenseSummaryBody').innerHTML=rows.join('');
     // Pagination controls + count
@@ -2438,22 +2460,36 @@ function confirmEditExpense(){
     const exps=gs(SK.expenses)||[];
     const e=exps.find(x=>String(x.id)===String(id));
     if(e){
-        e.date=document.getElementById('edit-date').value||e.date;
-        e.timeStr=document.getElementById('edit-time').value||e.timeStr;
-        e.shift=document.getElementById('edit-shift').value||e.shift;
-        e.category=(document.getElementById('edit-category-search')||{}).dataset?.value||'';
-        e.amount=Number(document.getElementById('edit-amount').value)||0;
-        e.detailVi=document.getElementById('edit-detail').value;
-        e.detailZh=document.getElementById('edit-detailZh').value;
-        e.status=document.getElementById('edit-status').value;
-        e.payMethod=document.getElementById('edit-payMethod').value;
-        e.supplier=document.getElementById('edit-supplier').value;
-        e.advanceName=document.getElementById('edit-advanceName').value;
+        var newDate=document.getElementById('edit-date').value||e.date;
+        if(newDate!==e.date){var ew=checkExpenseDate(newDate);if(ew&&!confirm(ew))return}
+        var newTime=document.getElementById('edit-time').value||e.timeStr;
+        var newShift=document.getElementById('edit-shift').value||e.shift;
+        var newCat=(document.getElementById('edit-category-search')||{}).dataset?.value||'';
+        var newAmt=Number(document.getElementById('edit-amount').value)||0;
+        var newVi=document.getElementById('edit-detail').value;
+        var newZh=document.getElementById('edit-detailZh').value;
+        var newSt=document.getElementById('edit-status').value;
+        var newPay=document.getElementById('edit-payMethod').value;
+        var newSup=document.getElementById('edit-supplier').value;
+        var newAdvN=document.getElementById('edit-advanceName').value;
+        var newAdvA=Number(document.getElementById('edit-advanceAmount').value)||0;
+        var newDep=newSt==='deposit'?Number(document.getElementById('edit-depositAmount').value)||0:0;
+        var newInv=document.getElementById('edit-invoice').checked;
+        var newVat=document.getElementById('edit-vat').checked;
+        var _ch=[];
+        var _fl={date:'Ngày',timeStr:'Giờ',shift:'Ca',category:'Phân loại',amount:'Số tiền',detailVi:'Nội dung VN',detailZh:'Nội dung TQ',status:'Trạng thái',payMethod:'Hình thức TT',supplier:'NCC',advanceName:'Tạm ứng',advanceAmount:'Tiền tạm ứng',depositAmount:'Tiền cọc',invoice:'Hóa đơn',vat:'VAT'};
+        var _nv={date:newDate,timeStr:newTime,shift:newShift,category:newCat,amount:newAmt,detailVi:newVi,detailZh:newZh,status:newSt,payMethod:newPay,supplier:newSup,advanceName:newAdvN,advanceAmount:newAdvA,depositAmount:newDep,invoice:newInv,vat:newVat};
+        for(var _k in _nv){if(String(_nv[_k])!==String(e[_k]||'')){_ch.push({field:_fl[_k]||_k,from:e[_k]||'',to:_nv[_k]})}}
+        if(_ch.length>0){if(!e.editHistory)e.editHistory=[];e.editHistory.push({at:new Date().toISOString(),by:currentUser?currentUser.displayName:'',changes:_ch})}
+        e.date=newDate;e.timeStr=newTime;e.shift=newShift;e.category=newCat;
+        e.amount=newAmt;e.detailVi=newVi;e.detailZh=newZh;e.status=newSt;
+        e.payMethod=newPay;e.supplier=newSup;
+        e.advanceName=newAdvN;
         var advRetVal=document.getElementById('edit-advanceReturned');if(advRetVal){e.advanceReturned=advRetVal.value==='yes';if(e.advanceReturned&&!e.advanceReturnedAt){e.advanceReturnedAt=new Date().toISOString();e.advanceReturnedBy=currentUser?currentUser.displayName:''}}
-        e.advanceAmount=Number(document.getElementById('edit-advanceAmount').value)||0;
-        e.depositAmount=e.status==='deposit'?Number(document.getElementById('edit-depositAmount').value)||0:0;
-        e.invoice=document.getElementById('edit-invoice').checked;
-        e.vat=document.getElementById('edit-vat').checked;
+        e.advanceAmount=newAdvA;
+        e.depositAmount=newDep;
+        e.invoice=newInv;
+        e.vat=newVat;
         ss(SK.expenses,exps);syncUpdateToSheet('expense',[e]);renderExpenseSummary();renderExpenseTracker();
     }
     // Check if editing from stats page — refresh stats + reopen detail
@@ -2475,6 +2511,91 @@ function deleteExpense(id){
     if(e&&e.confirmed&&currentUser.role!=='boss'){alert('Chi tiêu đã được xác nhận, không thể xóa! 已確認的支出無法刪除');return}
     if(!confirm('Xóa khoản chi tiêu này?'))return;
     ss(SK.expenses,exps.filter(x=>String(x.id)!==String(id)));syncDeleteFromSheet('expense',[id]);renderExpenseSummary();renderExpenseTracker();
+}
+
+function showExpenseHistory(id){
+    var exps=gs(SK.expenses)||[];
+    var e=exps.find(function(x){return String(x.id)===String(id)});
+    if(!e){showToast('Không tìm thấy chi tiêu 找不到支出','warning');return}
+    var html='<div style="padding:16px;max-height:70vh;overflow-y:auto">';
+    // Header
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+    html+='<h3 style="margin:0;color:var(--danger)">CT-'+String(e.id).slice(-4)+' — Lịch sử 歷史紀錄</h3>';
+    html+='<button onclick="document.getElementById(\'modalExpHistory\').classList.remove(\'open\')" style="background:none;border:none;font-size:20px;cursor:pointer">&times;</button>';
+    html+='</div>';
+    // Current info card
+    html+='<div style="background:var(--bg);border-radius:var(--radius);padding:12px;margin-bottom:16px;border-left:4px solid var(--primary)">';
+    html+='<div style="font-weight:700;margin-bottom:8px;color:var(--primary)">Thông tin hiện tại 目前資訊</div>';
+    html+='<table style="width:100%;font-size:12px;border-collapse:collapse">';
+    var fields=[
+        ['Ngày 日期',formatDateVN(e.date)],
+        ['Phân loại 分類',escHtml(e.category||'')],
+        ['Nội dung 內容',escHtml(e.detailVi||'')+(e.detailZh?' | '+escHtml(e.detailZh):'')],
+        ['Số tiền 金額',fmtNum(e.amount)+' ₫'],
+        ['Hình thức TT',e.payMethod==='transfer'?'CK 轉帳':e.payMethod==='credit'?'CN 賒帳':'TM 現金'],
+        ['NCC 供應商',escHtml(e.supplier||'—')],
+        ['Trạng thái',e.status==='paid'?'Đã chi':e.status==='deposit'?'Đã cọc':'Chưa chi'],
+        ['Người nhập',escHtml(e.displayName||e.user||'')]
+    ];
+    for(var fi=0;fi<fields.length;fi++){
+        html+='<tr style="border-bottom:1px solid var(--border)"><td style="padding:4px 8px;color:var(--text-muted);width:120px">'+fields[fi][0]+'</td><td style="padding:4px 8px;font-weight:500">'+fields[fi][1]+'</td></tr>';
+    }
+    html+='</table></div>';
+    // Creation info
+    html+='<div style="margin-bottom:16px">';
+    html+='<div style="font-weight:700;margin-bottom:8px;color:var(--success)">📝 Tạo lần đầu 首次建立</div>';
+    html+='<div style="background:#f0fdf4;border-radius:var(--radius);padding:10px 12px;font-size:12px">';
+    if(e.createdAt){
+        var ca=e.createdAt.replace('T',' ').slice(0,19);
+        html+='<div><strong>Thời gian 時間:</strong> '+ca+'</div>';
+    }else{
+        html+='<div style="color:var(--text-muted)">Không có thông tin thời gian tạo</div>';
+    }
+    html+='<div><strong>Người tạo 建立者:</strong> '+escHtml(e.displayName||e.user||'—')+'</div>';
+    html+='</div></div>';
+    // Edit history
+    var history=e.editHistory||[];
+    html+='<div style="margin-bottom:8px">';
+    html+='<div style="font-weight:700;margin-bottom:8px;color:var(--warning)">🔄 Lịch sử chỉnh sửa 修改歷史 <span style="font-size:11px;font-weight:400;color:var(--text-muted)">('+history.length+' lần)</span></div>';
+    if(history.length===0){
+        html+='<div style="background:#fefce8;border-radius:var(--radius);padding:10px 12px;font-size:12px;color:var(--text-muted)">Chưa có chỉnh sửa nào 尚無修改紀錄</div>';
+    }else{
+        for(var hi=history.length-1;hi>=0;hi--){
+            var h=history[hi];
+            var hTime=(h.at||'').replace('T',' ').slice(0,19);
+            html+='<div style="background:'+(hi%2===0?'#fefce8':'#fff7ed')+';border-radius:var(--radius);padding:10px 12px;margin-bottom:6px;border-left:3px solid var(--warning)">';
+            html+='<div style="display:flex;justify-content:space-between;margin-bottom:6px">';
+            html+='<span style="font-size:11px;font-weight:700;color:var(--warning)">Lần '+(hi+1)+' 第'+(hi+1)+'次</span>';
+            html+='<span style="font-size:11px;color:var(--text-muted)">'+hTime+' — '+escHtml(h.by||'')+'</span>';
+            html+='</div>';
+            var changes=h.changes||[];
+            if(changes.length>0){
+                html+='<table style="width:100%;font-size:11px;border-collapse:collapse">';
+                html+='<tr style="background:rgba(0,0,0,0.05)"><th style="padding:3px 6px;text-align:left">Mục 項目</th><th style="padding:3px 6px;text-align:left">Trước 修改前</th><th style="padding:3px 6px;text-align:left">Sau 修改後</th></tr>';
+                for(var ci=0;ci<changes.length;ci++){
+                    var c=changes[ci];
+                    html+='<tr style="border-bottom:1px solid rgba(0,0,0,0.05)"><td style="padding:3px 6px;color:var(--text-muted)">'+escHtml(c.field)+'</td><td style="padding:3px 6px;color:var(--danger);text-decoration:line-through">'+escHtml(String(c.from))+'</td><td style="padding:3px 6px;color:var(--success);font-weight:600">'+escHtml(String(c.to))+'</td></tr>';
+                }
+                html+='</table>';
+            }else{
+                html+='<div style="font-size:11px;color:var(--text-muted)">Không ghi nhận thay đổi cụ thể</div>';
+            }
+            html+='</div>';
+        }
+    }
+    html+='</div></div>';
+    // Show in modal
+    var modal=document.getElementById('modalExpHistory');
+    if(!modal){
+        modal=document.createElement('div');
+        modal.id='modalExpHistory';
+        modal.className='modal';
+        modal.innerHTML='<div class="modal-content" style="max-width:560px"></div>';
+        modal.onclick=function(ev){if(ev.target===modal)modal.classList.remove('open')};
+        document.body.appendChild(modal);
+    }
+    modal.querySelector('.modal-content').innerHTML=html;
+    modal.classList.add('open');
 }
 
 // ========== BATCH ==========
@@ -6814,7 +6935,7 @@ function renderDividendActual(){
             <td style="padding:8px 14px"><div style="font-weight:800;font-size:12px">🔒 LN đã chốt T${m}/${y} 已鎖定利潤</div></td>
             <td style="text-align:right;font-weight:800;color:${lockedProfit>=0?'var(--success)':'var(--danger)'};padding:8px 14px;font-size:16px">${fmt(lockedProfit)}</td></tr>
         ${byYearHtml}
-        <tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Vốn lưu động ${wPct}%</td><td style="text-align:right;padding:6px 14px;color:var(--warning);font-weight:700">${fmt(workingAmt)}</td></tr>
+        <tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Vốn lưu động ${wPct}% 流動資金</td><td style="text-align:right;padding:6px 14px;color:var(--warning);font-weight:700">${fmt(workingAmt)}</td></tr>
         ${reserveAmt>0?`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Quỹ dự bị 準備金</td><td style="text-align:right;padding:6px 14px;color:#10b981;font-weight:700">${fmt(reserveAmt)}</td></tr>`:''}
         <tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Thuế TGGT ${tgPct}% + TNCN ${tnPct}%</td><td style="text-align:right;padding:6px 14px;color:var(--primary);font-weight:700">${fmt(totalTax)}</td></tr>
         ${salaryAmt>0?`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:6px 14px;color:var(--text-muted)">(−) Lương cơ bản 基本薪資</td><td style="text-align:right;padding:6px 14px;color:var(--purple);font-weight:700">${fmt(salaryAmt)}</td></tr>`:''}
@@ -6930,12 +7051,12 @@ function downloadDividendPDF(y,m){
             <td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${fmtNum(myDiv)}</td>
             <td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${bfAmt>0?'-'+fmtNum(bfAmt):'—'}</td>
             <td style="padding:8px 12px;text-align:right;font-weight:700;border:1px solid #ddd">${fmtNum(net)}</td>
-            <td style="padding:8px 12px;text-align:center;border:1px solid #ddd">${isPaid?'Đã chi ✅':'Chưa chi ⏳'}</td></tr>`;
+            <td style="padding:8px 12px;text-align:center;border:1px solid #ddd">${isPaid?'Đã chi 已付 ✅':'Chưa chi 未付 ⏳'}</td></tr>`;
     });
 
     let byYearHtml='';
     if(lock.byYear){lock.byYear.forEach(yr=>{
-        byYearHtml+=`<tr><td style="padding:6px 12px;padding-left:28px;border:1px solid #ddd;color:#666">↳ ${yr.y}: DT ${fmtNum(yr.rev)} − CT ${fmtNum(yr.exp)}</td>
+        byYearHtml+=`<tr><td style="padding:6px 12px;padding-left:28px;border:1px solid #ddd;color:#666">↳ ${yr.y}: DT 營收 ${fmtNum(yr.rev)} − CT 支出 ${fmtNum(yr.exp)}</td>
             <td style="text-align:right;padding:6px 12px;border:1px solid #ddd;font-weight:600">${fmtNum(yr.profit)}</td></tr>`;
     })}
 
@@ -6970,39 +7091,39 @@ td{padding:6px 12px;border:1px solid #ddd}
 @media print{body{padding:0}button{display:none!important}}
 </style></head><body>
 <h1>BÁO CÁO PHÂN PHỐI LỢI TỨC 分紅分配報告</h1>
-<div class="subtitle">Kỳ: Tháng ${m}/${y} — QUÁCH GIA 郭家<br>Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}</div>
+<div class="subtitle">Kỳ 期間: Tháng ${m}/${y} — QUÁCH GIA 郭家<br>Ngày xuất 匯出日期: ${new Date().toLocaleDateString('vi-VN')}</div>
 
 <h2>I. Tổng hợp lợi nhuận & khấu trừ 利潤與扣除彙總</h2>
 <table>
-<tr><td style="padding:8px 12px;border:1px solid #ddd;font-weight:700">🔒 LN đã chốt T${m}/${y}</td>
+<tr><td style="padding:8px 12px;border:1px solid #ddd;font-weight:700">🔒 LN đã chốt T${m}/${y} 已鎖定利潤</td>
     <td style="text-align:right;padding:8px 12px;border:1px solid #ddd;font-weight:700;font-size:14px">${fmtNum(lock.cumulProfit)}</td></tr>
 ${byYearHtml}
 <tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Vốn lưu động ${wPct}%</td>
     <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(wA)}</td></tr>
-${rA>0?`<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Quỹ dự bị</td>
+${rA>0?`<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Quỹ dự bị 準備金</td>
     <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(rA)}</td></tr>`:''}
-<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Thuế TGGT ${tgP}%</td>
+<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Thuế TGGT ${tgP}% 增值稅</td>
     <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(tgA)}</td></tr>
-<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Thuế TNCN ${tnP}%</td>
+<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Thuế TNCN ${tnP}% 個人所得稅</td>
     <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(tnA)}</td></tr>
-${sA>0?`<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Lương cơ bản</td>
+${sA>0?`<tr><td style="padding:6px 12px;border:1px solid #ddd;color:#666">(−) Lương cơ bản 基本薪資</td>
     <td style="text-align:right;padding:6px 12px;border:1px solid #ddd">${fmtNum(sA)}</td></tr>`:''}
 ${feesHtml}
-<tr class="result-row"><td style="padding:10px 12px;border:1px solid #4f46e5">= LỢI TỨC THỰC TẾ T${m}/${y}</td>
+<tr class="result-row"><td style="padding:10px 12px;border:1px solid #4f46e5">= LỢI TỨC THỰC TẾ T${m}/${y} 實際分紅</td>
     <td style="text-align:right;padding:10px 12px;border:1px solid #4f46e5;font-size:16px">${fmtNum(dividend)} ₫</td></tr>
 </table>
 
 <h2>II. Phân phối theo cổ đông 按股東分配</h2>
 <table>
-<thead><tr><th>Cổ đông</th><th style="text-align:center">Tỷ lệ %</th><th style="text-align:right">Lợi tức</th><th style="text-align:right">PL khấu trừ</th><th style="text-align:right">Thực nhận</th><th style="text-align:center">Trạng thái</th></tr></thead>
+<thead><tr><th>Cổ đông 股東</th><th style="text-align:center">Tỷ lệ % 比例</th><th style="text-align:right">Lợi tức 分紅</th><th style="text-align:right">PL khấu trừ 扣除</th><th style="text-align:right">Thực nhận 實收</th><th style="text-align:center">Trạng thái 狀態</th></tr></thead>
 <tbody>${shHtml}</tbody>
 </table>
 
 <div class="sign-area">
-<div class="sign-box"><div class="label">Người lập báo cáo</div><div class="line">Ký tên, ghi rõ họ tên</div></div>
-<div class="sign-box"><div class="label">Đại diện cổ đông</div><div class="line">Ký tên, ghi rõ họ tên</div></div>
+<div class="sign-box"><div class="label">Người lập báo cáo 報告編制人</div><div class="line">Ký tên, ghi rõ họ tên 簽名</div></div>
+<div class="sign-box"><div class="label">Đại diện cổ đông 股東代表</div><div class="line">Ký tên, ghi rõ họ tên 簽名</div></div>
 </div>
-<div class="footer">Báo cáo được tạo tự động bởi Quách Gia App — ${new Date().toLocaleString('vi-VN')}</div>
+<div class="footer">Báo cáo được tạo tự động bởi Quách Gia App 報告由郭家App自動生成 — ${new Date().toLocaleString('vi-VN')}</div>
 <script>window.onload=function(){window.print()}<\/script>
 </body></html>`;
 
@@ -7995,43 +8116,6 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
         if(pm==='transfer'||pm==='Chuyển khoản')totalAppExp+=Number(e.amount)||0;
     });
     var totalBankExp=expenseTxns.reduce(function(s,t){return s+t.amount},0);
-    html+='<div class="card" style="margin-top:14px">';
-    html+='<h3 style="font-size:15px;margin-bottom:12px">📊 Đối chiếu Doanh thu tổng hợp 營收總對帳</h3>';
-    html+='<div class="table-wrap"><table><thead><tr><th>Khoản mục 項目</th><th style="text-align:right">App (hệ thống) 系統</th><th style="text-align:right">NH (ngân hàng) 銀行</th><th style="text-align:right">Chênh lệch 差額</th><th>Trạng thái 狀態</th></tr></thead><tbody>';
-    // CK row
-    var ckDiff=totalBankKov-totalAppCK;
-    html+='<tr><td>💳 Chuyển khoản (CK/KOV)</td><td style="text-align:right">'+fmtNum(totalAppCK)+'</td><td style="text-align:right">'+fmtNum(totalBankKov)+'</td><td style="text-align:right;font-weight:600;color:'+(Math.abs(ckDiff)<=1000?'var(--success)':'var(--danger)')+'">'+fmtNum(ckDiff)+'</td><td>'+(Math.abs(ckDiff)<=1000?'✅ Khớp':'⚠️ Lệch')+'</td></tr>';
-    // Grab row
-    var grDiff=totalBankGrab-totalAppGrab;
-    html+='<tr><td>🛵 Grab (lệch 1 ngày)</td><td style="text-align:right">'+fmtNum(totalAppGrab)+'</td><td style="text-align:right">'+fmtNum(totalBankGrab)+'</td><td style="text-align:right;font-weight:600;color:'+(Math.abs(grDiff)<=1000?'var(--success)':'var(--danger)')+'">'+fmtNum(grDiff)+'</td><td>'+(Math.abs(grDiff)<=1000?'✅ Khớp':'⚠️ Lệch')+'</td></tr>';
-    // Total CK+Grab row
-    var totalNonCash=totalAppCK+totalAppGrab;
-    var totalBankInAll=totalBankKov+totalBankGrab;
-    var nonCashDiff=totalBankInAll-totalNonCash;
-    html+='<tr style="font-weight:700;background:var(--bg-secondary)"><td>📊 Tổng DT qua NH (CK+Grab)</td><td style="text-align:right">'+fmtNum(totalNonCash)+'</td><td style="text-align:right">'+fmtNum(totalBankInAll)+'</td><td style="text-align:right;color:'+(Math.abs(nonCashDiff)<=1000?'var(--success)':'var(--danger)')+'">'+fmtNum(nonCashDiff)+'</td><td>'+(Math.abs(nonCashDiff)<=1000?'✅ Khớp':'⚠️ Lệch')+'</td></tr>';
-    // Cash row (info only)
-    html+='<tr style="color:var(--text-muted)"><td>💵 Tiền mặt (không qua NH)</td><td style="text-align:right">'+fmtNum(totalAppCash)+'</td><td style="text-align:right;font-style:italic">—</td><td style="text-align:right;font-style:italic">—</td><td style="font-size:10px">ℹ️ Không qua NH</td></tr>';
-    // Total revenue row
-    html+='<tr style="font-weight:700;border-top:2px solid var(--border)"><td>💰 TỔNG DOANH THU 總營收</td><td style="text-align:right;color:var(--success)">'+fmtNum(totalAppRevenue)+'</td><td style="text-align:right">'+fmtNum(totalBankInAll)+'</td><td colspan="2" style="font-size:10.5px;color:var(--text-muted)">DT qua NH chiếm '+(totalAppRevenue>0?Math.round(totalNonCash/totalAppRevenue*100):0)+'%</td></tr>';
-    // Expense CK row
-    var expDiff2=totalBankExp-totalAppExp;
-    html+='<tr style="border-top:1.5px solid var(--border)"><td>📤 Chi tiêu CK (tiền ra)</td><td style="text-align:right;color:var(--danger)">'+fmtNum(totalAppExp)+'</td><td style="text-align:right;color:var(--danger)">'+fmtNum(totalBankExp)+'</td><td style="text-align:right;font-weight:600;color:'+(Math.abs(expDiff2)<=1000?'var(--success)':'var(--danger)')+'">'+fmtNum(expDiff2)+'</td><td>'+(Math.abs(expDiff2)<=1000?'✅ Khớp':'⚠️ Lệch')+'</td></tr>';
-    html+='</tbody></table></div>';
-    html+='<div style="margin-top:8px;font-size:10.5px;color:var(--text-muted);line-height:1.5">💡 Xem chi tiết từng ngày ở các bảng bên dưới: <b>Đối chiếu Đơn</b>, <b>Đối chiếu TIỀN VÀO</b> (CK + Grab) và <b>Đối chiếu TIỀN RA</b> (Chi tiêu CK)</div>';
-    html+='</div>';
-
-    // ====== ORDER RECONCILIATION (Đối chiếu Đơn hàng) ======
-    html+='<div class="card" style="margin-top:14px">';
-    html+='<h3 style="font-size:15px;margin-bottom:12px">🧾 Đối chiếu Đơn hàng 訂單對帳</h3>';
-    html+='<p style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Paste danh sách đơn CK từ KiotViet → hệ thống tự khớp với giao dịch NH theo số tiền</p>';
-    html+='<textarea id="kvOrderInput" placeholder="Paste đơn CK từ KiotViet vào đây...\nVD:\nHD003291\n12/06/2026 21:29\nKhách lẻ\n519,750\t0\t519,750\t0\n519,750\nĐã phát hành\n3058" style="width:100%;height:100px;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;font-family:monospace;resize:vertical"></textarea>';
-    html+='<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
-    html+='<button onclick="runFullOrderMatch()" class="btn btn-primary" style="padding:8px 18px;font-size:12px;font-weight:600">📊 Phân tích đối chiếu đơn 分析訂單對帳</button>';
-    html+='<span style="font-size:10px;color:var(--text-muted)">Khớp tất cả đơn KiotViet với giao dịch KOV ngân hàng trong kỳ sao kê</span>';
-    html+='</div>';
-    html+='<div id="fullOrderMatchResult" style="margin-top:12px"></div>';
-    html+='</div>';
-
     // ====== CK RECONCILIATION (KOV vs Chuyển khoản doanh thu) ======
     html+='<div class="card" style="margin-top:14px">';
     html+='<h3 style="font-size:15px;margin-bottom:12px">🔍 Đối chiếu TIỀN VÀO 收入對賬</h3>';
@@ -8226,18 +8310,90 @@ function buildReconciliation(kovTxns,grabTxns,expenseTxns,minDate,maxDate){
 // Lịch sử điều chỉnh đối chiếu NH
 function getReconcileAdjustments(){return gs('qg_reconcile_adjustments')||[]}
 function saveReconcileAdjustment(adj){var list=getReconcileAdjustments();list.push(adj);ss('qg_reconcile_adjustments',list)}
-// Open add expense form from reconciliation mismatch
+// Open inline add expense form from reconciliation mismatch
 function openReconcileAddExp(date){
-    // Navigate to chi tiêu tab and pre-fill the date
-    navigateTo('expense');
-    setTimeout(function(){
-        var dateEl=document.getElementById('expense-date');
-        if(dateEl)dateEl.value=date;
-        // Scroll to form
-        var form=document.querySelector('.expense-form-container');
-        if(form)form.scrollIntoView({behavior:'smooth',block:'start'});
-        showToast('📝 Nhập chi tiêu cho ngày '+formatDateVN(date));
-    },200);
+    var containerId='recExpForm-'+date;
+    var existing=document.getElementById(containerId);
+    if(existing){existing.scrollIntoView({behavior:'smooth',block:'center'});return}
+    // Find the detail row to insert into
+    var detEl=document.getElementById('expDetail-'+date);
+    if(!detEl){showToast('Không tìm thấy dòng chi tiết','warning');return}
+    _befCounter++;
+    var uid=_befCounter;
+    var div=document.createElement('div');
+    div.id=containerId;
+    div.style.cssText='margin-top:10px;padding:14px;background:var(--primary-light);border:2px solid var(--primary);border-radius:8px';
+    div.innerHTML='<div style="display:flex;align-items:center;gap:6px;margin-bottom:12px;font-size:13px;font-weight:700;color:var(--primary)">➕ Thêm chi tiêu ngày '+formatDateVN(date)+' <span style="font-size:11px;font-weight:400;color:var(--text-muted)">從銀行新增支出</span></div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1.5fr 0.8fr;gap:8px;margin-bottom:8px">'
+        +'<div><label style="font-size:10px;color:var(--text-muted)">PHÂN LOẠI 分類</label>'
+        +'<div class="search-select" id="bef-catsel-'+uid+'"><input type="text" readonly placeholder="Chọn phân loại..." onclick="openSearchSelect(\'bef-catsel-'+uid+'\',\'category\')" id="bef-catinp-'+uid+'" data-value="" style="width:100%;padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer"><div class="dropdown" id="bef-catdd-'+uid+'"></div></div></div>'
+        +'<div><label style="font-size:10px;color:var(--text-muted)">NỘI DUNG CHI 支出內容</label>'
+        +'<input type="text" placeholder="Nội dung chi tiếng Việt" id="bef-vi-'+uid+'" oninput="befAutoZh('+uid+')" style="width:100%;padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px">'
+        +'<input type="text" placeholder="中文" id="bef-zh-'+uid+'" oninput="befAutoVi('+uid+')" style="width:100%;padding:5px 10px;font-size:11px;color:var(--text-secondary);background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-top:4px"></div>'
+        +'<div><label style="font-size:10px;color:var(--text-muted)">SỐ TIỀN 金額 (VNĐ)</label>'
+        +'<input type="text" id="bef-amt-'+uid+'" placeholder="0" oninput="formatAmountInput(this)" style="width:100%;padding:7px 10px;font-size:15px;font-weight:700;color:var(--danger);border:1.5px solid var(--border);border-radius:8px;text-align:right"></div>'
+        +'</div>'
+        +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">'
+        +'<div><label style="font-size:10px;color:var(--text-muted)">HÌNH THỨC TT</label>'
+        +'<select id="bef-pay-'+uid+'" style="width:100%;padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px">'
+        +'<option value="cash">Tiền mặt</option><option value="transfer" selected>Chuyển khoản</option><option value="credit">Công nợ</option></select></div>'
+        +'<div><label style="font-size:10px;color:var(--text-muted)">TRẠNG THÁI</label>'
+        +'<select id="bef-status-'+uid+'" style="width:100%;padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px">'
+        +'<option value="paid">Đã chi</option><option value="pending">Chưa chi</option></select></div>'
+        +'<div><label style="font-size:10px;color:var(--text-muted)">TẠM ỨNG</label>'
+        +'<div style="display:flex;gap:4px"><input type="text" placeholder="Người ứng" id="bef-advname-'+uid+'" style="flex:1;padding:7px 8px;font-size:12px;border:1.5px solid var(--border);border-radius:8px">'
+        +'<input type="text" placeholder="Số tiền" id="bef-advamt-'+uid+'" oninput="formatAmountInput(this)" style="width:80px;padding:7px 8px;font-size:12px;border:1.5px solid var(--border);border-radius:8px"></div></div>'
+        +'<div><label style="font-size:10px;color:var(--text-muted)">NCC 供應商</label>'
+        +'<div class="search-select" id="bef-supsel-'+uid+'"><input type="text" readonly placeholder="Chọn NCC..." onclick="openSearchSelect(\'bef-supsel-'+uid+'\',\'supplier\')" id="bef-supinp-'+uid+'" data-value="" style="width:100%;padding:7px 10px;font-size:12px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer"><div class="dropdown" id="bef-supdd-'+uid+'"></div></div></div>'
+        +'</div>'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">'
+        +'<div style="display:flex;align-items:center;gap:12px">'
+        +'<label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="bef-invoice-'+uid+'"> Hóa đơn</label>'
+        +'<label style="font-size:11px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="bef-vat-'+uid+'"> VAT</label>'
+        +'</div>'
+        +'<div style="display:flex;gap:8px">'
+        +'<button onclick="document.getElementById(\''+containerId+'\').remove()" class="btn btn-outline" style="padding:8px 16px;font-size:12px">Hủy</button>'
+        +'<button onclick="saveReconcileExpForm('+uid+',\''+date+'\',\''+containerId+'\')" class="btn btn-primary" style="padding:8px 20px;font-size:12px;font-weight:600">Lưu chi tiêu</button>'
+        +'</div></div>';
+    // Insert form into the detail cell
+    var cell=detEl.querySelector('td');
+    if(cell)cell.appendChild(div);
+    div.scrollIntoView({behavior:'smooth',block:'center'});
+}
+function saveReconcileExpForm(uid,date,containerId){
+    var catInp=document.getElementById('bef-catinp-'+uid);
+    var vi=document.getElementById('bef-vi-'+uid);
+    var zh=document.getElementById('bef-zh-'+uid);
+    var amt=document.getElementById('bef-amt-'+uid);
+    var pay=document.getElementById('bef-pay-'+uid);
+    var status=document.getElementById('bef-status-'+uid);
+    var advName=document.getElementById('bef-advname-'+uid);
+    var advAmt=document.getElementById('bef-advamt-'+uid);
+    var supInp=document.getElementById('bef-supinp-'+uid);
+    var invoice=document.getElementById('bef-invoice-'+uid);
+    var vat=document.getElementById('bef-vat-'+uid);
+    if(!vi||!vi.value){showToast('Vui lòng nhập nội dung chi 請輸入內容','warning');return}
+    var amount=parseFormattedNum(amt.value);
+    if(!amount){showToast('Vui lòng nhập số tiền 請輸入金額','warning');return}
+    var recDateWarn=checkExpenseDate(date);
+    if(recDateWarn&&!confirm(recDateWarn))return;
+    var category=(catInp&&catInp.dataset.value)?catInp.dataset.value:'';
+    if(!category){showToast('Vui lòng chọn phân loại 請選擇分類','warning');return}
+    var newExp={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),date:date,category:category,detailVi:vi.value,detailZh:zh?zh.value:'',amount:amount,payMethod:pay?pay.value:'transfer',status:status?status.value:'paid',hasInvoice:invoice?invoice.checked:false,hasVAT:vat?vat.checked:false,createdBy:currentUser?currentUser.display:'',createdAt:new Date().toISOString()};
+    if(advName&&advName.value){newExp.advanceName=advName.value;newExp.advanceAmount=advAmt?parseFormattedNum(advAmt.value):amount;newExp.advanceReturned=false}
+    if(supInp&&supInp.dataset.value)newExp.supplier=supInp.dataset.value;
+    // Generate code
+    var exps=gs(SK.expenses)||[];
+    var maxNum=0;exps.forEach(function(e){if(e.code){var m=e.code.match(/CT-(\d+)/);if(m)maxNum=Math.max(maxNum,parseInt(m[1]))}});
+    newExp.code='CT-'+String(maxNum+1).padStart(4,'0');
+    exps.unshift(newExp);
+    ss(SK.expenses,exps);
+    syncToSheet('expense',[newExp]);
+    showToast('Đã thêm chi tiêu '+newExp.code+' ('+fmtNum(amount)+') 已新增支出','success');
+    var el=document.getElementById(containerId);
+    if(el)el.remove();
+    // Re-run reconciliation
+    setTimeout(function(){var btn=document.getElementById('btnReconcile');if(btn)btn.click()},500);
 }
 
 
@@ -9531,6 +9687,8 @@ function saveBankExpForm(uid,txnId,bankAmt){
     var cat=catInp?catInp.dataset.value:'';
     if(!cat){showToast('Vui lòng chọn phân loại! 請選擇分類','error');return}
     var date=document.getElementById('bef-date-'+uid)?.value;
+    var bfDateWarn=checkExpenseDate(date);
+    if(bfDateWarn&&!confirm(bfDateWarn))return;
     var descVi=document.getElementById('bef-vi-'+uid)?.value||'';
     var descZh=document.getElementById('bef-zh-'+uid)?.value||'';
     var supInp=document.getElementById('bef-supinp-'+uid);
