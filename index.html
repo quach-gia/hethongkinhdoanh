@@ -4489,6 +4489,9 @@ function editExpenseFromStat(id,cat,month,year){
     if(e.confirmed&&currentUser.role!=='boss'){alert('Chi tiêu đã được xác nhận, không thể chỉnh sửa 已確認無法編輯');return}
     const cats=getCategories();
     const sups=getSuppliers();
+    document.getElementById('edit-date').value=e.date||'';
+    document.getElementById('edit-time').value=e.timeStr||'';
+    document.getElementById('edit-shift').value=e.shift||'1';
     var ecInp=document.getElementById('edit-category-search');if(ecInp){ecInp.value=e.category||'';ecInp.dataset.value=e.category||'';}
     document.getElementById('edit-supplier').innerHTML='<option value="">-- Chọn NCC 選供應商 --</option>'+sups.map(s=>`<option value="${escHtml(s)}" ${s===e.supplier?'selected':''}>${escHtml(s)}</option>`).join('');
     document.getElementById('edit-amount').value=e.amount;
@@ -4497,6 +4500,7 @@ function editExpenseFromStat(id,cat,month,year){
     document.getElementById('edit-status').value=e.status||'paid';
     document.getElementById('edit-payMethod').value=e.payMethod||'cash';
     document.getElementById('edit-advanceName').value=e.advanceName||'';
+    var advRetSel=document.getElementById('edit-advanceReturned');if(advRetSel)advRetSel.value=e.advanceReturned?'yes':'';
     document.getElementById('edit-advanceAmount').value=e.advanceAmount||0;
     document.getElementById('edit-depositAmount').value=e.depositAmount||0;
     document.getElementById('edit-invoice').checked=!!e.invoice;
@@ -4654,8 +4658,8 @@ function renderProfitStats(){
         const _dvLocksAll=getDividendLocks();
         const _dvPaidAll=_dvLocksAll.filter(l=>l.status==='paid');
         const _dvPendingAll=_dvLocksAll.filter(l=>l.status!=='paid');
-        const _totalPaidAll=_dvPaidAll.reduce((s,l)=>s+(l.paidTotal||calcLockDistributable(l)),0);
-        const _totalPendingAll=_dvPendingAll.reduce((s,l)=>s+calcLockDistributable(l),0);
+        const _totalPaidAll=_dvPaidAll.reduce((s,l)=>s+(l.paidTotal||calcLockTotalOutflow(l)),0);
+        const _totalPendingAll=_dvPendingAll.reduce((s,l)=>s+calcLockTotalOutflow(l),0);
         const _totalDivAll2=_totalPaidAll+_totalPendingAll;
         const _availProfitAll=tProfit-_totalDivAll2;
         document.getElementById('profitStatsCards').innerHTML=`<div style="display:grid;grid-template-columns:repeat(${Math.min(yearData.length+1,5)},1fr);gap:8px">${yearData.map(d=>`<div style="text-align:center;padding:10px;background:${d.profit>=0?'rgba(34,197,94,0.06)':'rgba(239,68,68,0.06)'};border-radius:8px;border:1.5px solid ${d.profit>=0?'var(--success)':'var(--danger)'}"><div style="font-size:9px;color:var(--text-muted)">LN ${d.y} 利潤</div><div style="font-weight:800;color:${d.profit>=0?'var(--success)':'var(--danger)'};font-size:13px">${fmt(d.profit)}</div><div style="font-size:8px;color:var(--text-muted)">${d.rev>0?(d.profit/d.rev*100).toFixed(1):'0'}%</div></div>`).join('')}<div style="text-align:center;padding:10px;background:${tProfit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};border-radius:8px;border:2px solid ${tProfit>=0?'var(--success)':'var(--danger)'}"><div style="font-size:9px;color:var(--text-muted)">Tổng 總計</div><div style="font-weight:800;color:${tProfit>=0?'var(--success)':'var(--danger)'};font-size:13px">${fmt(tProfit)}</div></div></div>${_totalDivAll2>0?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div style="text-align:center;padding:14px 12px;background:rgba(245,158,11,0.08);border-radius:10px;border:2px solid #f59e0b"><div style="font-size:11px;color:#f59e0b;font-weight:700;margin-bottom:6px">💸 LT đã chi/chờ chi 分紅</div><div style="font-weight:800;font-size:20px;color:#f59e0b;margin-bottom:4px">${fmt(_totalDivAll2)}</div><div style="font-size:9px;color:var(--text-muted)">${_dvPaidAll.length+_dvPendingAll.length} lần · Paid ${fmt(_totalPaidAll)} · Pending ${fmt(_totalPendingAll)}</div></div><div style="text-align:center;padding:14px 12px;background:${_availProfitAll>=0?'rgba(99,102,241,0.08)':'rgba(239,68,68,0.08)'};border-radius:10px;border:2px solid ${_availProfitAll>=0?'var(--primary)':'var(--danger)'}"><div style="font-size:11px;color:${_availProfitAll>=0?'var(--primary)':'var(--danger)'};font-weight:700;margin-bottom:6px">📊 Lợi nhuận khả dụng 可用利潤</div><div style="font-weight:800;font-size:20px;color:${_availProfitAll>=0?'var(--primary)':'var(--danger)'};margin-bottom:4px">${fmt(_availProfitAll)}</div><div style="font-size:9px;color:var(--text-muted)">= Lũy kế ${fmt(tProfit)} − Đã phân phối ${fmt(_totalDivAll2)}</div></div></div>`:''}`;
@@ -4688,8 +4692,8 @@ function renderProfitStats(){
         const _dvLocks=getDividendLocks();
         const _dvPaid=_dvLocks.filter(l=>l.status==='paid');
         const _dvPending=_dvLocks.filter(l=>l.status!=='paid');
-        const _totalPaid=_dvPaid.reduce((s,l)=>s+(l.paidTotal||calcLockDistributable(l)),0);
-        const _totalPending=_dvPending.reduce((s,l)=>s+calcLockDistributable(l),0);
+        const _totalPaid=_dvPaid.reduce((s,l)=>s+(l.paidTotal||calcLockTotalOutflow(l)),0);
+        const _totalPending=_dvPending.reduce((s,l)=>s+calcLockTotalOutflow(l),0);
         const _totalDivAll=_totalPaid+_totalPending;
         const _availProfit=cumul.profit-_totalDivAll;
         document.getElementById('profitStatsCards').innerHTML=`
@@ -4770,8 +4774,8 @@ function renderProfitStats(){
         const _dvLocksFY=getDividendLocks();
         const _dvPaidFY=_dvLocksFY.filter(l=>l.status==='paid');
         const _dvPendingFY=_dvLocksFY.filter(l=>l.status!=='paid');
-        const _totalPaidFY=_dvPaidFY.reduce((s,l)=>s+(l.paidTotal||calcLockDistributable(l)),0);
-        const _totalPendingFY=_dvPendingFY.reduce((s,l)=>s+calcLockDistributable(l),0);
+        const _totalPaidFY=_dvPaidFY.reduce((s,l)=>s+(l.paidTotal||calcLockTotalOutflow(l)),0);
+        const _totalPendingFY=_dvPendingFY.reduce((s,l)=>s+calcLockTotalOutflow(l),0);
         const _totalDivAllFY=_totalPaidFY+_totalPendingFY;
         const _availProfitFY=cumulFY.profit-_totalDivAllFY;
         document.getElementById('profitStatsCards').innerHTML=`
@@ -6631,6 +6635,13 @@ function calcLockDistributable(l){
     const oF=(l.otherFees||[]).reduce((s,f)=>s+(f.amount||0),0);
     return l.cumulProfit-wA-rA-sA-tT-oF;
 }
+function calcLockTotalOutflow(l){
+    var settings=getDividendSettings();
+    var wPct=l.workingPct!==undefined?l.workingPct:(settings.workingPct||0);
+    var wA=Math.round(l.cumulProfit*wPct/100);
+    var rA=l.reserveAmt||0;
+    return l.cumulProfit-wA-rA;
+}
 // Auto-recovery T6/2026 lock (xóa nhầm ngày 07/07/2026)
 (function(){
     const locks=getDividendLocks();
@@ -6662,7 +6673,7 @@ function lockDividend(){
     const cumul=getCumulativeProfit(now.getFullYear(),now.getMonth()+1,null);
     const settings=getDividendSettings();
     // Subtract previously paid dividends from cumulative profit
-    const totalPaidOut=locks.reduce((s,l)=>s+(l.paidTotal||calcLockDistributable(l)),0);
+    const totalPaidOut=locks.reduce((s,l)=>s+(l.paidTotal||calcLockTotalOutflow(l)),0);
     const adjustedProfit=cumul.profit-totalPaidOut;
     locks.push({
         id:Date.now().toString(), year:y, month:m, lockedAt:new Date().toISOString(),
@@ -6762,7 +6773,7 @@ function toggleActualDivPaid(lockId,shId){
         const tnP=lock.tncnPct!==undefined?lock.tncnPct:(settings.tncnPct||1.5);
         const tT=Math.round(tR*tgP/100)+Math.max(0,Math.round((tR-gS)*tnP/100));
         const oF=(lock.otherFees||[]).reduce((s,f)=>s+(f.amount||0),0);
-        lock.paidTotal=lock.cumulProfit-wA-rA-sA-tT-oF;
+        lock.paidTotal=lock.cumulProfit-wA-rA;
     } else {lock.paidTotal=0;}
     saveDividendLocks(locks);
     renderDividendActual();
@@ -6781,7 +6792,7 @@ function renderDividendActual(){
     const now=new Date();
     const currentCumul=getCumulativeProfit(now.getFullYear(),now.getMonth()+1,null);
     const allLocks=getDividendLocks();
-    const totalPaidPrior=allLocks.filter(l=>l.id!==(lock?lock.id:'')).reduce((s,l)=>s+(l.paidTotal||calcLockDistributable(l)),0);
+    const totalPaidPrior=allLocks.filter(l=>l.id!==(lock?lock.id:'')).reduce((s,l)=>s+(l.paidTotal||calcLockTotalOutflow(l)),0);
     const adjustedCurrentProfit=currentCumul.profit-totalPaidPrior;
     html+=`<div style="margin-bottom:14px;padding:16px 18px;border-radius:12px;border:1.5px solid rgba(99,102,241,0.3);background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(99,102,241,0.01))">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -6943,30 +6954,32 @@ function renderDividendActual(){
         <tr style="background:${dividend>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'};font-weight:800;border-top:3px solid ${dividend>=0?'var(--success)':'var(--danger)'}"><td style="padding:10px 14px;font-size:13px">= Lợi tức thực tế T${m}/${y} 實際可分配利潤</td><td style="text-align:right;padding:10px 14px;color:${dividend>=0?'var(--success)':'var(--danger)'};font-size:18px">${fmt(dividend)}</td></tr>
     </table>`;
 
-    // === SHAREHOLDER BREAKDOWN (with benefit deduction) ===
+    // === SHAREHOLDER BREAKDOWN (with salary + benefit deduction) ===
     if(shs.length>0&&dividend!==0){
         const allEntries=gs(SK.benefitEntries)||[];
+        const hasWorkingSh=shs.some(s=>s.type==='working'&&(s.salary||0)>0);
         html+=`<div style="margin-bottom:10px;padding:14px 18px;border-radius:12px;border:1.5px solid rgba(34,197,94,0.3);background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(34,197,94,0.01))">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:18px">👥</span><div style="font-weight:700;font-size:12px">Chia theo cổ đông 按股東分配</div></div>
-            <table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px;text-align:left">Cổ đông</th><th style="padding:5px;text-align:right">% LN</th><th style="padding:5px;text-align:right">Lợi tức</th><th style="padding:5px;text-align:right">PL đã nhận</th><th style="padding:5px;text-align:right;font-weight:800">Thực nhận</th><th style="padding:5px;text-align:center">T.Thái</th></tr></thead><tbody>`;
+            <table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px;text-align:left">Cổ đông 股東</th><th style="padding:5px;text-align:right">% LN</th><th style="padding:5px;text-align:right">Lợi tức 分紅</th>${hasWorkingSh?'<th style="padding:5px;text-align:right">Lương 月薪</th>':''}<th style="padding:5px;text-align:right">PL khấu trừ 扣除</th><th style="padding:5px;text-align:right;font-weight:800">Tổng nhận 總收</th><th style="padding:5px;text-align:center">T.Thái</th></tr></thead><tbody>`;
         shs.forEach(sh=>{
             const myDiv=Math.round(dividend*sh.percent/100);
+            const mySalary=(sh.type==='working')?(sh.salary||0):0;
             // Calculate benefits already received this month
             const benefitAmt=allEntries.filter(e=>e.shareholderId===sh.id&&e.status==='received').reduce((s,e)=>{
-                // Check if benefit is for this year/month based on date
                 const d=e.date?new Date(e.date):null;
                 if(d&&d.getFullYear()===y&&d.getMonth()+1===m) return s+(e.amount||0);
                 return s;
             },0);
-            const netAmt=myDiv-benefitAmt;
+            const totalReceive=myDiv+mySalary-benefitAmt;
             const shPaid=lock.shares?lock.shares.find(s=>s.shId===sh.id):null;
             const isPaid=shPaid&&shPaid.paid;
             html+=`<tr style="border-bottom:1px solid #f0f0f0">
                 <td style="padding:6px 5px;font-weight:600">${sh.name} <span style="font-size:8px;color:var(--text-muted)">${sh.type==='working'?'在店':'投資'}</span></td>
                 <td style="padding:6px 5px;text-align:right;color:var(--primary);font-weight:700">${sh.percent}%</td>
                 <td style="padding:6px 5px;text-align:right;font-weight:600">${fmt(myDiv)}</td>
+                ${hasWorkingSh?`<td style="padding:6px 5px;text-align:right;color:var(--purple);font-weight:600">${mySalary>0?fmt(mySalary):'—'}</td>`:''}
                 <td style="padding:6px 5px;text-align:right;color:var(--warning)">${benefitAmt>0?'-'+fmtNum(benefitAmt):'—'}</td>
-                <td style="padding:6px 5px;text-align:right;font-weight:800;color:${netAmt>=0?'var(--success)':'var(--danger)'}">${fmt(netAmt)}</td>
+                <td style="padding:6px 5px;text-align:right;font-weight:800;color:${totalReceive>=0?'var(--success)':'var(--danger)'}">${fmt(totalReceive)}</td>
                 <td style="padding:6px 5px;text-align:center"><button onclick="toggleActualDivPaid('${lock.id}','${sh.id}')" style="padding:3px 10px;border-radius:10px;border:1px solid ${isPaid?'var(--success)':'var(--border)'};background:${isPaid?'rgba(34,197,94,0.1)':'#fff'};color:${isPaid?'var(--success)':'var(--text-muted)'};font-size:9px;font-weight:600;cursor:pointer">${isPaid?'✅ Đã chi':'⏳ Chưa'}</button></td>
             </tr>`;
         });
@@ -6981,6 +6994,13 @@ function renderDividendActual(){
 
     document.getElementById('dividendActualContent').innerHTML=html;
     renderDividendLockHistory();
+}
+function jumpToLockMonth(year,month){
+    document.getElementById('lt2-year').value=year;
+    document.getElementById('lt2-month').value=month;
+    renderDividendActual();
+    var content=document.getElementById('dividendActualContent');
+    if(content)content.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function renderDividendLockHistory(){
     const locks=getDividendLocks().sort((a,b)=>(b.year*100+b.month)-(a.year*100+a.month));
@@ -7003,8 +7023,8 @@ function renderDividendLockHistory(){
         const rA2=l.reserveAmt||0;
         const sA2=l.salaryAmt||0;
         const div=l.cumulProfit-wA-rA2-sA2-tT-oF;
-        html+=`<tr style="border-bottom:1px solid #f0f0f0">
-            <td style="padding:6px 5px;font-weight:700">T${l.month}/${l.year}</td>
+        html+=`<tr style="border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background 0.15s" onmouseenter="this.style.background='rgba(99,102,241,0.06)'" onmouseleave="this.style.background=''" onclick="jumpToLockMonth(${l.year},${l.month})" title="Bấm để xem/sửa 點擊查看/編輯">
+            <td style="padding:6px 5px;font-weight:700;color:var(--primary);text-decoration:underline dotted">T${l.month}/${l.year}</td>
             <td style="padding:6px 5px;text-align:right;color:${l.cumulProfit>=0?'var(--success)':'var(--danger)'};font-weight:600">${fmtNum(l.cumulProfit)}</td>
             <td style="padding:6px 5px;text-align:right;color:var(--primary)">${fmtNum(tT)}</td>
             <td style="padding:6px 5px;text-align:right;font-weight:800;color:${div>=0?'var(--success)':'var(--danger)'}">${fmtNum(div)}</td>
@@ -7036,21 +7056,26 @@ function downloadDividendPDF(y,m){
     const oF=(lock.otherFees||[]).reduce((s,f)=>s+(f.amount||0),0);
     const dividend=lock.cumulProfit-wA-rA-sA-tT-oF;
 
+    const hasWorkingSh=shs.some(s=>s.type==='working');
     let shHtml='';
     shs.forEach(sh=>{
         const myDiv=Math.round(dividend*sh.percent/100);
+        const mySalary=sh.type==='working'?(sh.salary||0):0;
+        const myBonus=sh.type==='working'?(sh.bonus||0):0;
         const bfAmt=entries.filter(e=>e.shareholderId===sh.id&&e.status==='received').reduce((s,e)=>{
             const d=e.date?new Date(e.date):null;
             if(d&&d.getFullYear()===y&&d.getMonth()+1===m) return s+(e.amount||0);return s;
         },0);
-        const net=myDiv-bfAmt;
+        const totalReceive=myDiv+mySalary+myBonus-bfAmt;
         const shPaid=lock.shares?lock.shares.find(s=>s.shId===sh.id):null;
         const isPaid=shPaid&&shPaid.paid;
         shHtml+=`<tr><td style="padding:8px 12px;font-weight:600;border:1px solid #ddd">${sh.name}</td>
             <td style="padding:8px 12px;text-align:center;border:1px solid #ddd">${sh.percent}%</td>
-            <td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${fmtNum(myDiv)}</td>
-            <td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${bfAmt>0?'-'+fmtNum(bfAmt):'—'}</td>
-            <td style="padding:8px 12px;text-align:right;font-weight:700;border:1px solid #ddd">${fmtNum(net)}</td>
+            <td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${fmtNum(myDiv)}</td>`;
+        if(hasWorkingSh) shHtml+=`<td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${sh.type==='working'?fmtNum(mySalary):'—'}</td>
+            <td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${sh.type==='working'?fmtNum(myBonus):'—'}</td>`;
+        shHtml+=`<td style="padding:8px 12px;text-align:right;border:1px solid #ddd">${bfAmt>0?'-'+fmtNum(bfAmt):'—'}</td>
+            <td style="padding:8px 12px;text-align:right;font-weight:700;border:1px solid #ddd">${fmtNum(totalReceive)}</td>
             <td style="padding:8px 12px;text-align:center;border:1px solid #ddd">${isPaid?'Đã chi 已付 ✅':'Chưa chi 未付 ⏳'}</td></tr>`;
     });
 
@@ -7115,7 +7140,7 @@ ${feesHtml}
 
 <h2>II. Phân phối theo cổ đông 按股東分配</h2>
 <table>
-<thead><tr><th>Cổ đông 股東</th><th style="text-align:center">Tỷ lệ % 比例</th><th style="text-align:right">Lợi tức 分紅</th><th style="text-align:right">PL khấu trừ 扣除</th><th style="text-align:right">Thực nhận 實收</th><th style="text-align:center">Trạng thái 狀態</th></tr></thead>
+<thead><tr><th>Cổ đông 股東</th><th style="text-align:center">Tỷ lệ % 比例</th><th style="text-align:right">Lợi tức 分紅</th>${hasWorkingSh?'<th style="text-align:right">Lương 月薪</th><th style="text-align:right">Thưởng 獎金</th>':''}<th style="text-align:right">PL khấu trừ 扣除</th><th style="text-align:right">Tổng nhận 總收入</th><th style="text-align:center">Trạng thái 狀態</th></tr></thead>
 <tbody>${shHtml}</tbody>
 </table>
 
@@ -7141,16 +7166,22 @@ function downloadShareholderPDF(shId){
     const isW=sh.type==='working';
 
     // Dividend history
-    let divHtml='';let totalDiv=0,totalPaid=0;
+    let divHtml='';let totalDiv=0,totalPaid=0,totalSalary=0,totalBonus=0;
     locks.forEach(lock=>{
         const div=calcLockDistributable(lock);
         const myDiv=Math.round(div*sh.percent/100);
+        const mSal=isW?(sh.salary||0):0;
+        const mBon=isW?(sh.bonus||0):0;
+        const mTotal=myDiv+mSal+mBon;
         const shPaid=lock.shares?lock.shares.find(s=>s.shId===shId):null;
         const isPaid=shPaid&&shPaid.paid;
-        totalDiv+=myDiv;
-        if(isPaid) totalPaid+=myDiv;
+        totalDiv+=myDiv;totalSalary+=mSal;totalBonus+=mBon;
+        if(isPaid) totalPaid+=mTotal;
         divHtml+=`<tr><td style="padding:6px 10px;border:1px solid #ddd;font-weight:600">T${lock.month}/${lock.year}</td>
-            <td style="text-align:right;padding:6px 10px;border:1px solid #ddd">${fmtNum(myDiv)}</td>
+            <td style="text-align:right;padding:6px 10px;border:1px solid #ddd">${fmtNum(myDiv)}</td>`;
+        if(isW) divHtml+=`<td style="text-align:right;padding:6px 10px;border:1px solid #ddd">${fmtNum(mSal)}</td>
+            <td style="text-align:right;padding:6px 10px;border:1px solid #ddd">${fmtNum(mBon)}</td>`;
+        divHtml+=`<td style="text-align:right;padding:6px 10px;border:1px solid #ddd;font-weight:700">${fmtNum(mTotal)}</td>
             <td style="text-align:center;padding:6px 10px;border:1px solid #ddd">${isPaid?'✅ Đã chi':'⏳ Chưa'}</td>
             <td style="text-align:center;padding:6px 10px;border:1px solid #ddd;font-size:10px">${isPaid&&shPaid.paidAt?new Date(shPaid.paidAt).toLocaleDateString('vi-VN'):'—'}</td></tr>`;
     });
@@ -7204,15 +7235,15 @@ td{padding:6px 10px;border:1px solid #ddd}
 
 <div class="summary-bar">
 <div class="summary-item"><div class="s-label">Tổng lợi tức 分紅總額</div><div class="s-val">${fmtNum(totalDiv)} ₫</div></div>
-<div class="summary-item"><div class="s-label">Đã nhận LT 已領分紅</div><div class="s-val" style="color:#10b981">${fmtNum(totalPaid)} ₫</div></div>
+${isW?'<div class="summary-item"><div class="s-label">Tổng lương 薪資總額</div><div class="s-val" style="color:#8b5cf6">'+fmtNum(totalSalary)+' ₫</div></div><div class="summary-item"><div class="s-label">Tổng thưởng 獎金總額</div><div class="s-val" style="color:#f59e0b">'+fmtNum(totalBonus)+' ₫</div></div>':''}
+<div class="summary-item"><div class="s-label">Đã nhận 已領</div><div class="s-val" style="color:#10b981">${fmtNum(totalPaid)} ₫</div></div>
 <div class="summary-item"><div class="s-label">Tổng phúc lợi 福利總額</div><div class="s-val" style="color:#f59e0b">${fmtNum(totalBf)} ₫</div></div>
-<div class="summary-item"><div class="s-label">PL đã nhận 已領福利</div><div class="s-val" style="color:#10b981">${fmtNum(totalBfRec)} ₫</div></div>
 </div>
 
 <h2>I. Lịch sử lợi tức 分紅歷史</h2>
 <table>
-<thead><tr><th>Kỳ 期間</th><th style="text-align:right">Lợi tức 分紅</th><th style="text-align:center">Trạng thái 狀態</th><th style="text-align:center">Ngày chi 付款日</th></tr></thead>
-<tbody>${divHtml||'<tr><td colspan="4" style="text-align:center;padding:12px;color:#999;border:1px solid #ddd">Chưa có dữ liệu</td></tr>'}</tbody>
+<thead><tr><th>Kỳ 期間</th><th style="text-align:right">Lợi tức 分紅</th>${isW?'<th style="text-align:right">Lương 月薪</th><th style="text-align:right">Thưởng 獎金</th>':''}<th style="text-align:right">Tổng nhận 總收入</th><th style="text-align:center">Trạng thái 狀態</th><th style="text-align:center">Ngày chi 付款日</th></tr></thead>
+<tbody>${divHtml||'<tr><td colspan="'+(isW?7:5)+'" style="text-align:center;padding:12px;color:#999;border:1px solid #ddd">Chưa có dữ liệu</td></tr>'}</tbody>
 </table>
 
 <h2>II. Lịch sử phúc lợi 福利歷史</h2>
