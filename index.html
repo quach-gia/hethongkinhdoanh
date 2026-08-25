@@ -1472,7 +1472,7 @@ function wrapDateInputs(){
     });
 }
 // ========== STORE ==========
-const SK={users:'qg_users',expenses:'qg_expenses',revenues:'qg_revenues',shifts:'qg_shifts',session:'qg_session',categories:'qg_categories',suppliers:'qg_suppliers',shareholders:'qg_shareholders',benefits:'qg_benefits',benefitEntries:'qg_benefit_entries',dividendSettings:'qg_dividend_settings',dividendPayments:'qg_dividend_payments',otherFees:'qg_other_fees',dividendSkip:'qg_dividend_skip',taxRevManual:'qg_tax_rev_manual',dividendLocks:'qg_dividend_locks',reserveFund:'qg_reserve_fund'};
+const SK={users:'qg_users',expenses:'qg_expenses',revenues:'qg_revenues',shifts:'qg_shifts',session:'qg_session',categories:'qg_categories',suppliers:'qg_suppliers',shareholders:'qg_shareholders',benefits:'qg_benefits',benefitEntries:'qg_benefit_entries',dividendSettings:'qg_dividend_settings',dividendPayments:'qg_dividend_payments',otherFees:'qg_other_fees',dividendSkip:'qg_dividend_skip',taxRevManual:'qg_tax_rev_manual',dividendLocks:'qg_dividend_locks',reserveFund:'qg_reserve_fund',benefitDeductions:'qg_benefit_deductions'};
 const _mem={};
 function gs(k){if(_mem[k]!==undefined)return _mem[k];const d=localStorage.getItem(k);if(d){var p=JSON.parse(d);_mem[k]=p;return p}return null}
 function ss(k,d){_mem[k]=d;try{localStorage.setItem(k,JSON.stringify(d))}catch(e){console.warn('localStorage full, key='+k,e)}}
@@ -5266,6 +5266,143 @@ function migrateBenefitEntries(){
     }
 }
 
+// === Seed Historical Benefits (one-time import) ===
+function seedHistoricalBenefits(){
+    if(localStorage.getItem('qg_benefit_seed_v2')) return;
+    var shs=gs(SK.shareholders)||[];
+    var heng=shs.find(function(s){return s.name&&s.name.toLowerCase().indexOf('heng')>=0});
+    var ting=shs.find(function(s){return s.name&&s.name.toLowerCase().indexOf('ting')>=0});
+    if(!heng||!ting) return; // need both shareholders
+
+    // Ensure categories exist
+    var cats=gs(SK.benefits)||[];
+    function ensureCat(name){
+        var c=cats.find(function(x){return x.name===name});
+        if(!c){c={id:Date.now().toString()+(Math.random()*1000|0),name:name};cats.push(c)}
+        return c.id;
+    }
+    var catHousing=ensureCat('Thuê nhà 住宿費');
+    var catOldDiv=ensureCat('Lợi tức cũ 利潤分配');
+    var catReturn=ensureCat('Chi phí về Đài 返臺費');
+    ss(SK.benefits,cats);
+
+    var entries=gs(SK.benefitEntries)||[];
+    var ts=Date.now();
+    function addE(date,catId,amt,shId,status,recDate){
+        entries.push({id:(++ts).toString(),date:date,benefitId:catId,amount:amt,shareholderId:shId,
+            receiveDate:recDate||'',status:status,year:Number(date.split('-')[0]),month:Number(date.split('-')[1])});
+    }
+
+    // === 住宿費 Housing 2,200,000/month ===
+    var housingDates=['2025-09-09','2025-10-13','2025-11-09','2025-12-09','2026-01-09','2026-02-09','2026-03-09','2026-04-08','2026-05-08','2026-06-06'];
+    housingDates.forEach(function(d,i){
+        addE(d,catHousing,2200000,heng.id,'received',d);
+        addE(d,catHousing,2200000,ting.id,i===0?'received':'pending',i===0?d:'');
+    });
+
+    // === 利潤分配 Old profit distribution ===
+    addE('2025-09-11',catOldDiv,4000000,heng.id,'received','2025-09-11');
+    addE('2025-09-11',catOldDiv,4000000,ting.id,'received','2025-09-11');
+    addE('2025-10-13',catOldDiv,10200000,heng.id,'received','2025-10-13');
+    addE('2025-10-13',catOldDiv,10200000,ting.id,'pending','');
+    addE('2026-03-18',catOldDiv,10150000,heng.id,'received','2026-03-18');
+    addE('2026-03-18',catOldDiv,10150000,ting.id,'received','2026-03-18');
+
+    // === 返臺費 Return to Taiwan ===
+    addE('2025-07-29',catReturn,10000000,heng.id,'received','2025-07-29');
+    addE('2025-09-20',catReturn,10000000,ting.id,'received','2025-09-20');
+    addE('2025-10-21',catReturn,9000000,heng.id,'received','2025-10-21');
+    addE('2025-10-21',catReturn,9000000,ting.id,'pending','');
+    addE('2026-01-19',catReturn,10000000,heng.id,'received','2026-01-19');
+    addE('2026-01-19',catReturn,10000000,ting.id,'pending','');
+
+    ss(SK.benefitEntries,entries);
+    delete _mem[SK.benefitEntries];
+    delete _mem[SK.benefits];
+    localStorage.setItem('qg_benefit_seed_v2','1');
+    console.log('[Benefit] Seeded '+housingDates.length*2+' housing + 6 dividend + 6 return entries');
+}
+
+// === Benefit Deduction Management ===
+function showAddDeduction(){
+    var shs=gs(SK.shareholders)||[];
+    if(shs.length<2){showToast('Cần ít nhất 2 cổ đông');return}
+    var entries=gs(SK.benefitEntries)||[];
+    // Find shareholder with unpaid benefits
+    var unpaidByShId={};
+    entries.forEach(function(e){
+        if(e.status!=='received'&&e.amount>0){
+            unpaidByShId[e.shareholderId]=(unpaidByShId[e.shareholderId]||0)+e.amount;
+        }
+    });
+    var deductionSh=null,payerSh=null;
+    shs.forEach(function(s){
+        if(unpaidByShId[s.id]>0) deductionSh=s;
+        else payerSh=s;
+    });
+    if(!deductionSh){
+        // If both have unpaid, pick the one with more
+        var max=0;
+        shs.forEach(function(s){if((unpaidByShId[s.id]||0)>max){max=unpaidByShId[s.id];deductionSh=s}});
+        payerSh=shs.find(function(s){return s.id!==deductionSh.id});
+    }
+    if(!payerSh) payerSh=shs.find(function(s){return s.id!==deductionSh.id});
+    var totalUnpaid=unpaidByShId[deductionSh.id]||0;
+    var deductions=gs(SK.benefitDeductions)||[];
+    var alreadyDeducted=deductions.filter(function(d){return d.forShId===deductionSh.id}).reduce(function(s,d){return s+(d.amount||0)},0);
+    var remaining=Math.max(0,totalUnpaid-alreadyDeducted);
+
+    var modal='<div id="deductionModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px">';
+    modal+='<div style="background:#fff;border-radius:16px;padding:20px;max-width:380px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,0.2)">';
+    modal+='<div style="font-weight:800;font-size:14px;margin-bottom:14px">📋 Ghi nhận khấu trừ 記錄扣除</div>';
+    modal+='<div style="padding:10px;border-radius:8px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);margin-bottom:12px;font-size:11px">';
+    modal+='<div>PL chưa nhận của <strong>'+deductionSh.name+'</strong>: <strong style="color:var(--warning)">'+fmt(totalUnpaid)+'</strong></div>';
+    modal+='<div>Đã khấu trừ: <strong style="color:var(--success)">'+fmt(alreadyDeducted)+'</strong></div>';
+    modal+='<div>Còn nợ: <strong style="color:var(--danger)">'+fmt(remaining)+'</strong></div></div>';
+    modal+='<div style="margin-bottom:10px"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px">Ngày khấu trừ 扣除日期</label>';
+    modal+='<input type="date" id="ded-date" value="'+new Date().toISOString().slice(0,10)+'" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"></div>';
+    modal+='<div style="margin-bottom:10px"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px">Số tiền khấu trừ từ LT của '+payerSh.name+' 從分紅扣除金額</label>';
+    modal+='<input type="text" id="ded-amount" placeholder="VD: 5000000" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:12px"></div>';
+    modal+='<div style="margin-bottom:14px"><label style="font-size:11px;font-weight:600;display:block;margin-bottom:4px">Ghi chú 備註</label>';
+    modal+='<textarea id="ded-notes" rows="3" placeholder="VD: Khấu trừ từ LT T8/2026 cho phần thuê nhà T10-12/2025" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:11px;resize:vertical"></textarea></div>';
+    modal+='<div style="display:flex;gap:8px"><button onclick="saveDeduction(\''+deductionSh.id+'\',\''+payerSh.id+'\')" style="flex:1;padding:10px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-weight:700;font-size:12px;cursor:pointer">💾 Lưu 儲存</button>';
+    modal+='<button onclick="document.getElementById(\'deductionModal\').remove()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:10px;background:#fff;color:var(--text-secondary);font-weight:600;font-size:12px;cursor:pointer">Hủy 取消</button></div>';
+    modal+='</div></div>';
+    document.body.insertAdjacentHTML('beforeend',modal);
+}
+function saveDeduction(forShId,fromShId){
+    var date=document.getElementById('ded-date').value;
+    var amount=parseMoney(document.getElementById('ded-amount').value);
+    var notes=document.getElementById('ded-notes').value.trim();
+    if(!date){showToast('Chọn ngày!');return}
+    if(!amount||amount<=0){showToast('Nhập số tiền!');return}
+    var deductions=gs(SK.benefitDeductions)||[];
+    deductions.push({id:Date.now().toString(),date:date,forShId:forShId,fromShId:fromShId,amount:amount,notes:notes});
+    ss(SK.benefitDeductions,deductions);
+    delete _mem[SK.benefitDeductions];
+    document.getElementById('deductionModal').remove();
+    showToast('Đã ghi nhận khấu trừ '+fmt(amount));
+    // Re-render current view
+    var activeTab=document.querySelector('#tongquan-sub-tabs .tq-sub');
+    if(activeTab){
+        var onc=activeTab.getAttribute('onclick');
+        if(onc&&onc.indexOf('all')>-1) renderLoitucOverview();
+        else{
+            var curId=onc?onc.match(/'([^']+)'/):null;
+            if(curId&&curId[1]) renderShareholderDetail(curId[1]);
+            else renderLoitucOverview();
+        }
+    } else renderLoitucOverview();
+}
+function deleteDeduction(id){
+    if(!confirm('Xóa bản ghi khấu trừ này?\n刪除此扣除記錄？'))return;
+    var deductions=(gs(SK.benefitDeductions)||[]).filter(function(d){return d.id!==id});
+    ss(SK.benefitDeductions,deductions);
+    delete _mem[SK.benefitDeductions];
+    renderLoitucOverview();
+    showToast('Đã xóa khấu trừ');
+}
+
 // === Benefit Entry CRUD ===
 function showAddBenefitEntry(){
     const form=document.getElementById('addBenefitEntryForm');
@@ -5719,6 +5856,7 @@ function copyBenefitEntry(id){
 
 // === Lợi Tức Tổng Quan 總覽 ===
 function renderLoitucOverview(){
+    seedHistoricalBenefits();
     var shs=gs(SK.shareholders)||[];
     var entries=(gs(SK.benefitEntries)||[]).filter(function(e){return e.amount>0});
     var locks=getDividendLocks();
@@ -5809,53 +5947,105 @@ function renderLoitucOverview(){
     html+='<div style="font-size:20px;font-weight:800;color:var(--warning)">'+fmt(totalBfDeduct)+'</div></div>';
     html+='</div></div>';
 
-    // --- 5. Per-shareholder dividend distribution details ---
+    // --- 5. Nợ phúc lợi / Khấu trừ 福利債務 ---
+    var deductions=gs(SK.benefitDeductions)||[];
+    var unpaidByShId={};
+    entries.forEach(function(e){if(e.status!=='received'&&e.amount>0) unpaidByShId[e.shareholderId]=(unpaidByShId[e.shareholderId]||0)+e.amount});
+    var hasUnpaid=Object.keys(unpaidByShId).some(function(k){return unpaidByShId[k]>0});
+    if(hasUnpaid||deductions.length>0){
+        html+='<div class="card" style="padding:14px;border-left:4px solid var(--danger)">';
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+        html+='<div style="font-weight:700;font-size:13px">📋 Nợ phúc lợi / Khấu trừ 福利債務</div>';
+        html+='<button onclick="showAddDeduction()" style="padding:6px 16px;border-radius:16px;border:none;background:var(--danger);color:#fff;font-weight:700;font-size:10px;cursor:pointer">+ Ghi khấu trừ</button></div>';
+        // Per-shareholder unpaid summary
+        shs.forEach(function(sh){
+            var unpaid=unpaidByShId[sh.id]||0;if(unpaid<=0) return;
+            var deducted=deductions.filter(function(d){return d.forShId===sh.id}).reduce(function(s,d){return s+(d.amount||0)},0);
+            var remaining=Math.max(0,unpaid-deducted);
+            var payerSh=shs.find(function(s){return s.id!==sh.id});
+            html+='<div style="padding:10px;border-radius:8px;background:rgba(239,68,68,0.03);border:1px solid rgba(239,68,68,0.1);margin-bottom:10px">';
+            html+='<div style="font-weight:700;font-size:11px;margin-bottom:8px">'+sh.name+' — Phúc lợi chưa nhận 未領福利</div>';
+            html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">';
+            html+='<div style="padding:8px;border-radius:6px;background:rgba(245,158,11,0.06);text-align:center;border:1px solid rgba(245,158,11,0.1)"><div style="font-size:9px;color:var(--text-muted)">Chưa nhận 未領</div><div style="font-size:13px;font-weight:800;color:var(--warning)">'+fmt(unpaid)+'</div></div>';
+            html+='<div style="padding:8px;border-radius:6px;background:rgba(16,185,129,0.06);text-align:center;border:1px solid rgba(16,185,129,0.1)"><div style="font-size:9px;color:var(--text-muted)">Đã khấu trừ 已扣</div><div style="font-size:13px;font-weight:800;color:var(--success)">'+fmt(deducted)+'</div></div>';
+            html+='<div style="padding:8px;border-radius:6px;background:rgba(239,68,68,0.06);text-align:center;border:1px solid rgba(239,68,68,0.1)"><div style="font-size:9px;color:var(--text-muted)">Còn nợ 尚欠</div><div style="font-size:13px;font-weight:800;color:var(--danger)">'+fmt(remaining)+'</div></div>';
+            html+='</div>';
+            if(payerSh&&remaining>0){
+                html+='<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px">→ Sẽ trừ dần từ LT của <strong>'+payerSh.name+'</strong> 將從'+payerSh.name+'的分紅中扣除</div>';
+            }
+            // Deduction log
+            var shDeductions=deductions.filter(function(d){return d.forShId===sh.id});
+            if(shDeductions.length>0){
+                html+='<div style="font-size:10px;font-weight:600;margin-bottom:4px;color:var(--text-secondary)">Lịch sử khấu trừ 扣除記錄:</div>';
+                html+='<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:4px 6px;text-align:left">Ngày</th><th style="padding:4px 6px;text-align:left">Từ CĐ</th><th style="padding:4px 6px;text-align:right">Số tiền</th><th style="padding:4px 6px;text-align:left">Ghi chú</th><th style="padding:4px 6px;width:30px"></th></tr></thead><tbody>';
+                shDeductions.forEach(function(d){
+                    var fromSh=shs.find(function(s){return s.id===d.fromShId});
+                    html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:3px 6px">'+(d.date?formatDateVN(d.date):'—')+'</td>';
+                    html+='<td style="padding:3px 6px;font-weight:600">'+(fromSh?fromSh.name:'—')+'</td>';
+                    html+='<td style="padding:3px 6px;text-align:right;font-weight:700;color:var(--danger)">'+fmt(d.amount||0)+'</td>';
+                    html+='<td style="padding:3px 6px;font-size:9px;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+(d.notes||'')+'">'+(d.notes||'—')+'</td>';
+                    html+='<td style="padding:3px 6px"><button onclick="deleteDeduction(\''+d.id+'\')" style="padding:1px 4px;font-size:9px;background:var(--danger);color:#fff;border:none;border-radius:4px;cursor:pointer">✕</button></td></tr>';
+                });
+                html+='</tbody></table>';
+            }
+            html+='</div>';
+        });
+        html+='</div>';
+    }
+
+    // --- 6. Per-shareholder dividend distribution details (with salary) ---
     if(shs.length>0&&locks.length>0){
         html+='<div class="card" style="padding:14px">';
         html+='<div style="font-weight:700;font-size:13px;margin-bottom:12px">📋 Chi tiết phân phối theo cổ đông 股東分紅明細</div>';
         shs.forEach(function(sh){
-            var shDivTotal=0,shDivPaid=0,shBfTotal=0;
+            var shDivTotal=0,shDivPaid=0,shBfTotal=0,shSalTotal=0,shBonTotal=0;
             var shRows=[];
+            var isW=sh.type==='working';
             locks.forEach(function(lock){
-                var lwP=lock.workingPct!==undefined?lock.workingPct:40;
-                var lwA=Math.round((lock.cumulProfit||0)*lwP/100);
-                var lrA=lock.reserveAmt||0;var lsA=lock.salaryAmt||0;
-                var ltR=lock.taxRevenue||0;var lgS=lock.govSupport||0;
-                var ltgP=lock.tggtPct!==undefined?lock.tggtPct:3;var ltnP=lock.tncnPct!==undefined?lock.tncnPct:1.5;
-                var ltT=Math.round(ltR*ltgP/100)+Math.max(0,Math.round((ltR-lgS)*ltnP/100));
-                var loF=(lock.otherFees||[]).reduce(function(s,f){return s+(f.amount||0)},0);
-                var lDiv=(lock.cumulProfit||0)-lwA-lrA-lsA-ltT-loF;
-                var myDiv=Math.round(lDiv*sh.percent/100);
+                var div=calcLockDistributable(lock);
+                var myDiv=Math.round(div*sh.percent/100);
+                var mSal=getShSalary(sh,lock.year,lock.month);
+                var mBon=getShBonus(sh,lock.year,lock.month);
+                var mTotal=myDiv+mSal+mBon;
                 var shPaidInfo=lock.shares?lock.shares.find(function(s){return s.shId===sh.id}):null;
                 var isPaid=shPaidInfo&&shPaidInfo.paid;
                 var paidAt=isPaid&&shPaidInfo.paidAt?new Date(shPaidInfo.paidAt).toLocaleDateString('vi-VN'):'—';
-                shDivTotal+=myDiv;
-                if(isPaid) shDivPaid+=myDiv;
-                shRows.push({period:'T'+lock.month+'/'+lock.year,amount:myDiv,isPaid:isPaid,paidAt:paidAt});
+                shDivTotal+=myDiv;shSalTotal+=mSal;shBonTotal+=mBon;
+                if(isPaid) shDivPaid+=mTotal;
+                shRows.push({period:'T'+lock.month+'/'+lock.year,amount:myDiv,salary:mSal,bonus:mBon,total:mTotal,isPaid:isPaid,paidAt:paidAt});
             });
+            var shGrandTotal=shDivTotal+shSalTotal+shBonTotal;
             // Benefits for this shareholder
             var shBenefits=entries.filter(function(e){return e.shareholderId===sh.id});
             shBenefits.forEach(function(e){shBfTotal+=e.amount});
-            var isW=sh.type==='working';
             html+='<div style="margin-bottom:14px;padding:12px;border-radius:10px;border:1.5px solid '+(isW?'rgba(16,185,129,0.2)':'rgba(59,130,246,0.2)')+';background:'+(isW?'rgba(16,185,129,0.03)':'rgba(59,130,246,0.03)')+'">';
             html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
             html+='<div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">'+(isW?'👤':'💼')+'</span><span style="font-weight:700;font-size:13px">'+sh.name+'</span><span style="font-size:11px;color:var(--primary);font-weight:700">'+sh.percent+'%</span></div>';
-            html+='<div style="text-align:right"><div style="font-size:10px;color:var(--text-muted)">Tổng LT 分紅總額</div><div style="font-size:15px;font-weight:800;color:var(--success)">'+fmt(shDivTotal)+'</div></div>';
+            html+='<div style="text-align:right"><div style="font-size:10px;color:var(--text-muted)">Tổng thu nhập 總收入</div><div style="font-size:15px;font-weight:800;color:var(--success)">'+fmt(shGrandTotal)+'</div></div>';
             html+='</div>';
             // Summary cards
-            html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">';
+            html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:6px;margin-bottom:8px">';
             html+='<div style="padding:6px 8px;border-radius:6px;background:rgba(16,185,129,0.06);text-align:center;border:1px solid rgba(16,185,129,0.1)"><div style="font-size:9px;color:var(--text-muted)">Đã nhận LT 已領</div><div style="font-size:12px;font-weight:700;color:var(--success)">'+fmt(shDivPaid)+'</div></div>';
             html+='<div style="padding:6px 8px;border-radius:6px;background:rgba(245,158,11,0.06);text-align:center;border:1px solid rgba(245,158,11,0.1)"><div style="font-size:9px;color:var(--text-muted)">Phúc lợi 福利</div><div style="font-size:12px;font-weight:700;color:var(--warning)">'+fmt(shBfTotal)+'</div></div>';
-            if(isW){html+='<div style="padding:6px 8px;border-radius:6px;background:rgba(139,92,246,0.06);text-align:center;border:1px solid rgba(139,92,246,0.1)"><div style="font-size:9px;color:var(--text-muted)">Lương CB 基本薪</div><div style="font-size:12px;font-weight:700;color:var(--purple)">'+fmt(sh.salary||0)+'</div></div>';}
-            else{html+='<div style="padding:6px 8px;border-radius:6px;background:rgba(148,163,184,0.06);text-align:center;border:1px solid rgba(148,163,184,0.1)"><div style="font-size:9px;color:var(--text-muted)">Vốn ĐT 投資</div><div style="font-size:12px;font-weight:700;color:var(--text-secondary)">'+fmtNum(sh.investment||0)+'</div></div>';}
+            if(isW){
+                html+='<div style="padding:6px 8px;border-radius:6px;background:rgba(139,92,246,0.06);text-align:center;border:1px solid rgba(139,92,246,0.1)"><div style="font-size:9px;color:var(--text-muted)">Lương 薪資</div><div style="font-size:12px;font-weight:700;color:var(--purple)">'+fmt(shSalTotal)+'</div></div>';
+                if(shBonTotal>0) html+='<div style="padding:6px 8px;border-radius:6px;background:rgba(245,158,11,0.06);text-align:center;border:1px solid rgba(245,158,11,0.1)"><div style="font-size:9px;color:var(--text-muted)">Thưởng 獎金</div><div style="font-size:12px;font-weight:700;color:var(--warning)">'+fmt(shBonTotal)+'</div></div>';
+            } else {
+                html+='<div style="padding:6px 8px;border-radius:6px;background:rgba(148,163,184,0.06);text-align:center;border:1px solid rgba(148,163,184,0.1)"><div style="font-size:9px;color:var(--text-muted)">Vốn ĐT 投資</div><div style="font-size:12px;font-weight:700;color:var(--text-secondary)">'+fmtNum(sh.investment||0)+'</div></div>';
+            }
             html+='</div>';
-            // Distribution table per lock
+            // Distribution table per lock (with salary columns for working)
             if(shRows.length>0){
-                html+='<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:4px 6px;text-align:left">Kỳ 期間</th><th style="padding:4px 6px;text-align:right">Lợi tức 分紅</th><th style="padding:4px 6px;text-align:center">T.Thái 狀態</th><th style="padding:4px 6px;text-align:center">Ngày chi 付款日</th></tr></thead><tbody>';
+                html+='<div style="overflow-x:auto"><table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:4px 6px;text-align:left">Kỳ 期間</th><th style="padding:4px 6px;text-align:right">Lợi tức 分紅</th>';
+                if(isW) html+='<th style="padding:4px 6px;text-align:right">Lương 薪</th>';
+                html+='<th style="padding:4px 6px;text-align:right;color:var(--primary)">Tổng 總</th><th style="padding:4px 6px;text-align:center">T.Thái 狀態</th><th style="padding:4px 6px;text-align:center">Ngày chi</th></tr></thead><tbody>';
                 shRows.forEach(function(r){
-                    html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:4px 6px;font-weight:600">'+r.period+'</td><td style="padding:4px 6px;text-align:right;font-weight:700;color:var(--success)">'+fmt(r.amount)+'</td><td style="padding:4px 6px;text-align:center"><span style="padding:1px 8px;border-radius:8px;font-size:9px;font-weight:600;background:'+(r.isPaid?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)')+';color:'+(r.isPaid?'var(--success)':'var(--warning)')+'">'+(r.isPaid?'✅ Đã chi':'⏳ Chưa')+'</span></td><td style="padding:4px 6px;text-align:center;font-size:9px;color:var(--text-muted)">'+r.paidAt+'</td></tr>';
+                    html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:4px 6px;font-weight:600">'+r.period+'</td><td style="padding:4px 6px;text-align:right;font-weight:700;color:var(--success)">'+fmt(r.amount)+'</td>';
+                    if(isW) html+='<td style="padding:4px 6px;text-align:right;color:var(--purple)">'+(r.salary>0?fmt(r.salary):'—')+'</td>';
+                    html+='<td style="padding:4px 6px;text-align:right;font-weight:800;color:var(--primary)">'+fmt(r.total)+'</td>';
+                    html+='<td style="padding:4px 6px;text-align:center"><span style="padding:1px 8px;border-radius:8px;font-size:9px;font-weight:600;background:'+(r.isPaid?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)')+';color:'+(r.isPaid?'var(--success)':'var(--warning)')+'">'+(r.isPaid?'✅ Đã chi':'⏳ Chưa')+'</span></td><td style="padding:4px 6px;text-align:center;font-size:9px;color:var(--text-muted)">'+r.paidAt+'</td></tr>';
                 });
-                html+='</tbody></table>';
+                html+='</tbody></table></div>';
             }
             html+='</div>';
         });
@@ -5888,6 +6078,8 @@ function renderShareholderDetail(shId){
     var sh=shs.find(function(s){return s.id===shId});
     if(!sh) return;
     var locks=getDividendLocks();
+    var cats=gs(SK.benefits)||[];
+    var catMap={};cats.forEach(function(c){catMap[c.id]=c.name});
     var entries=(gs(SK.benefitEntries)||[]).filter(function(e){return e.shareholderId===shId&&e.amount>0});
     var isW=sh.type==='working';
     var html='';
@@ -5913,71 +6105,153 @@ function renderShareholderDetail(shId){
     html+='<div style="font-size:10px;color:var(--text-muted)">Vốn đầu tư 投資額</div><div style="font-size:16px;font-weight:800;color:var(--success)">'+fmtNum(sh.investment||0)+'</div></div>';
     html+='</div></div>';
 
-    // === Lợi tức history ===
-    var totalDiv=0,totalPaid=0,divRows=[];
+    // === Lợi tức history (with salary/bonus for working shareholders) ===
+    var totalDiv=0,totalPaid=0,totalSalary=0,totalBonus=0,divRows=[];
     locks.forEach(function(lock){
         var div=calcLockDistributable(lock);
         var myDiv=Math.round(div*sh.percent/100);
+        var mSal=getShSalary(sh,lock.year,lock.month);
+        var mBon=getShBonus(sh,lock.year,lock.month);
+        var mTotal=myDiv+mSal+mBon;
         var shPaid=lock.shares?lock.shares.find(function(s){return s.shId===shId}):null;
         var isPaid=shPaid&&shPaid.paid;
-        totalDiv+=myDiv;
-        if(isPaid) totalPaid+=myDiv;
-        divRows.push({period:'T'+lock.month+'/'+lock.year,amount:myDiv,isPaid:isPaid,paidAt:isPaid&&shPaid.paidAt?new Date(shPaid.paidAt).toLocaleDateString('vi-VN'):'—'});
+        totalDiv+=myDiv;totalSalary+=mSal;totalBonus+=mBon;
+        if(isPaid) totalPaid+=mTotal;
+        divRows.push({period:'T'+lock.month+'/'+lock.year,amount:myDiv,salary:mSal,bonus:mBon,total:mTotal,isPaid:isPaid,paidAt:isPaid&&shPaid.paidAt?new Date(shPaid.paidAt).toLocaleDateString('vi-VN'):'—'});
     });
+    var grandTotal=totalDiv+totalSalary+totalBonus;
 
     html+='<div class="card" style="padding:14px">';
-    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-weight:700;font-size:13px">💰 Lợi tức 分紅</div>';
-    html+='<div style="display:flex;gap:12px"><span style="font-size:10px;color:var(--text-muted)">Tổng: <strong style="color:var(--primary)">'+fmt(totalDiv)+'</strong></span>';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-weight:700;font-size:13px">💰 Lợi tức '+(isW?'+ Lương 分紅+薪資':'分紅')+'</div>';
+    html+='<div style="display:flex;gap:12px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text-muted)">Tổng: <strong style="color:var(--primary)">'+fmt(grandTotal)+'</strong></span>';
     html+='<span style="font-size:10px;color:var(--text-muted)">Đã nhận: <strong style="color:var(--success)">'+fmt(totalPaid)+'</strong></span>';
-    html+='<span style="font-size:10px;color:var(--text-muted)">Chưa nhận: <strong style="color:var(--danger)">'+fmt(totalDiv-totalPaid)+'</strong></span></div></div>';
+    html+='<span style="font-size:10px;color:var(--text-muted)">Chưa nhận: <strong style="color:var(--danger)">'+fmt(grandTotal-totalPaid)+'</strong></span></div></div>';
 
     if(divRows.length>0){
-        html+='<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px;text-align:left">Kỳ 期間</th><th style="padding:6px 8px;text-align:right">Lợi tức 分紅</th><th style="padding:6px 8px;text-align:center">Trạng thái 狀態</th><th style="padding:6px 8px;text-align:center">Ngày chi 付款日</th></tr></thead><tbody>';
+        html+='<div style="overflow-x:auto"><table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px;text-align:left">Kỳ 期間</th><th style="padding:6px 8px;text-align:right">Lợi tức 分紅</th>';
+        if(isW) html+='<th style="padding:6px 8px;text-align:right">Lương 月薪</th><th style="padding:6px 8px;text-align:right">Thưởng 獎金</th>';
+        html+='<th style="padding:6px 8px;text-align:right;color:var(--primary)">Tổng nhận 總收入</th><th style="padding:6px 8px;text-align:center">T.Thái 狀態</th><th style="padding:6px 8px;text-align:center">Ngày chi 付款日</th></tr></thead><tbody>';
         divRows.forEach(function(r){
             html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 8px;font-weight:600">'+r.period+'</td>';
             html+='<td style="padding:5px 8px;text-align:right;font-weight:700;color:var(--success)">'+fmt(r.amount)+'</td>';
+            if(isW){
+                html+='<td style="padding:5px 8px;text-align:right;color:var(--purple);font-weight:600">'+(r.salary>0?fmt(r.salary):'—')+'</td>';
+                html+='<td style="padding:5px 8px;text-align:right;color:var(--warning);font-weight:600">'+(r.bonus>0?fmt(r.bonus):'—')+'</td>';
+            }
+            html+='<td style="padding:5px 8px;text-align:right;font-weight:800;color:var(--primary)">'+fmt(r.total)+'</td>';
             html+='<td style="padding:5px 8px;text-align:center"><span style="padding:2px 10px;border-radius:8px;font-size:9px;font-weight:600;background:'+(r.isPaid?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)')+';color:'+(r.isPaid?'var(--success)':'var(--warning)')+'">'+(r.isPaid?'✅ Đã chi':'⏳ Chưa')+'</span></td>';
             html+='<td style="padding:5px 8px;text-align:center;font-size:10px;color:var(--text-muted)">'+r.paidAt+'</td></tr>';
         });
-        html+='</tbody></table>';
+        // Footer totals
+        html+='<tr style="background:var(--bg-secondary);font-weight:800;border-top:2px solid var(--primary)"><td style="padding:6px 8px">Tổng 合計</td>';
+        html+='<td style="padding:6px 8px;text-align:right;color:var(--success)">'+fmt(totalDiv)+'</td>';
+        if(isW){
+            html+='<td style="padding:6px 8px;text-align:right;color:var(--purple)">'+fmt(totalSalary)+'</td>';
+            html+='<td style="padding:6px 8px;text-align:right;color:var(--warning)">'+fmt(totalBonus)+'</td>';
+        }
+        html+='<td style="padding:6px 8px;text-align:right;color:var(--primary)">'+fmt(grandTotal)+'</td>';
+        html+='<td colspan="2"></td></tr>';
+        html+='</tbody></table></div>';
     } else {
         html+='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">Chưa có lợi tức</div>';
     }
     html+='</div>';
 
-    // === Phúc lợi history ===
+    // === Phúc lợi history (with catName lookup) ===
     var totalBf=0,totalBfRec=0;
     entries.forEach(function(e){totalBf+=e.amount||0;if(e.status==='received')totalBfRec+=e.amount||0});
 
     html+='<div class="card" style="padding:14px">';
     html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div style="font-weight:700;font-size:13px">🎁 Phúc lợi 福利</div>';
     html+='<div style="display:flex;gap:12px"><span style="font-size:10px;color:var(--text-muted)">Tổng: <strong style="color:var(--warning)">'+fmt(totalBf)+'</strong></span>';
-    html+='<span style="font-size:10px;color:var(--text-muted)">Đã nhận: <strong style="color:var(--success)">'+fmt(totalBfRec)+'</strong></span></div></div>';
+    html+='<span style="font-size:10px;color:var(--text-muted)">Đã nhận: <strong style="color:var(--success)">'+fmt(totalBfRec)+'</strong></span>';
+    html+='<span style="font-size:10px;color:var(--text-muted)">Chưa nhận: <strong style="color:var(--danger)">'+fmt(totalBf-totalBfRec)+'</strong></span></div></div>';
 
     if(entries.length>0){
-        html+='<table style="width:100%;font-size:11px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:6px 8px;text-align:left">Ngày 日期</th><th style="padding:6px 8px;text-align:left">Hạng mục 項目</th><th style="padding:6px 8px;text-align:right">Số tiền 金額</th><th style="padding:6px 8px;text-align:center">T.Thái 狀態</th></tr></thead><tbody>';
+        // Group by category
+        var byCat={};
         entries.forEach(function(e){
-            html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:5px 8px;font-size:10px">'+(e.date||'—')+'</td>';
-            html+='<td style="padding:5px 8px">'+(e.catName||'—')+'</td>';
-            html+='<td style="padding:5px 8px;text-align:right;font-weight:600">'+fmt(e.amount||0)+'</td>';
-            html+='<td style="padding:5px 8px;text-align:center"><span style="padding:2px 10px;border-radius:8px;font-size:9px;font-weight:600;background:'+(e.status==='received'?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)')+';color:'+(e.status==='received'?'var(--success)':'var(--warning)')+'">'+(e.status==='received'?'✅ Đã nhận':'⏳ Chưa')+'</span></td></tr>';
+            var cn=catMap[e.benefitId]||e.catName||'Khác';
+            if(!byCat[cn]) byCat[cn]={items:[],total:0,rec:0};
+            byCat[cn].items.push(e);byCat[cn].total+=e.amount||0;
+            if(e.status==='received') byCat[cn].rec+=e.amount||0;
         });
-        html+='</tbody></table>';
+        Object.keys(byCat).forEach(function(catName){
+            var grp=byCat[catName];
+            html+='<div style="margin-bottom:10px"><div style="font-weight:600;font-size:11px;margin-bottom:4px;color:var(--text-secondary)">📌 '+catName+' <span style="color:var(--warning)">'+fmt(grp.total)+'</span>'+(grp.total-grp.rec>0?' — <span style="color:var(--danger)">Chưa nhận: '+fmt(grp.total-grp.rec)+'</span>':'')+'</div>';
+            html+='<table style="width:100%;font-size:10px;border-collapse:collapse"><thead><tr style="background:var(--bg-secondary)"><th style="padding:5px 8px;text-align:left">Ngày 日期</th><th style="padding:5px 8px;text-align:right">Số tiền 金額</th><th style="padding:5px 8px;text-align:center">T.Thái 狀態</th><th style="padding:5px 8px;text-align:center">Ngày nhận</th></tr></thead><tbody>';
+            grp.items.sort(function(a,b){return (a.date||'').localeCompare(b.date||'')});
+            grp.items.forEach(function(e){
+                html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:4px 8px">'+(e.date?formatDateVN(e.date):'—')+'</td>';
+                html+='<td style="padding:4px 8px;text-align:right;font-weight:600">'+fmt(e.amount||0)+'</td>';
+                html+='<td style="padding:4px 8px;text-align:center"><span style="padding:2px 8px;border-radius:8px;font-size:9px;font-weight:600;background:'+(e.status==='received'?'rgba(16,185,129,0.1)':'rgba(245,158,11,0.1)')+';color:'+(e.status==='received'?'var(--success)':'var(--warning)')+'">'+(e.status==='received'?'✅ Đã nhận':'⏳ Chưa')+'</span></td>';
+                html+='<td style="padding:4px 8px;text-align:center;font-size:9px;color:var(--text-muted)">'+(e.receiveDate?formatDateVN(e.receiveDate):'—')+'</td></tr>';
+            });
+            html+='</tbody></table></div>';
+        });
     } else {
         html+='<div style="text-align:center;padding:16px;color:var(--text-muted);font-size:11px">Chưa có phúc lợi</div>';
     }
     html+='</div>';
 
+    // === Nợ phúc lợi / Khấu trừ 福利債務 ===
+    var deductions=gs(SK.benefitDeductions)||[];
+    var otherSh=shs.find(function(s){return s.id!==shId});
+    // Ting's unpaid benefits → deducted from Heng
+    var myUnpaid=totalBf-totalBfRec;
+    var myDeducted=deductions.filter(function(d){return d.forShId===shId}).reduce(function(s,d){return s+(d.amount||0)},0);
+    var deductedFromMe=deductions.filter(function(d){return d.fromShId===shId});
+    var totalDeductedFromMe=deductedFromMe.reduce(function(s,d){return s+(d.amount||0)},0);
+
+    if(myUnpaid>0||totalDeductedFromMe>0||myDeducted>0){
+        html+='<div class="card" style="padding:14px;border-left:4px solid var(--danger)">';
+        html+='<div style="font-weight:700;font-size:13px;margin-bottom:12px">📋 Nợ phúc lợi / Khấu trừ 福利債務</div>';
+        if(myUnpaid>0){
+            html+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">';
+            html+='<div style="padding:10px;border-radius:8px;background:rgba(245,158,11,0.06);text-align:center;border:1px solid rgba(245,158,11,0.15)"><div style="font-size:9px;color:var(--text-muted)">Chưa nhận 未領</div><div style="font-size:14px;font-weight:800;color:var(--warning)">'+fmt(myUnpaid)+'</div></div>';
+            html+='<div style="padding:10px;border-radius:8px;background:rgba(16,185,129,0.06);text-align:center;border:1px solid rgba(16,185,129,0.15)"><div style="font-size:9px;color:var(--text-muted)">Đã khấu trừ 已扣</div><div style="font-size:14px;font-weight:800;color:var(--success)">'+fmt(myDeducted)+'</div></div>';
+            html+='<div style="padding:10px;border-radius:8px;background:rgba(239,68,68,0.06);text-align:center;border:1px solid rgba(239,68,68,0.15)"><div style="font-size:9px;color:var(--text-muted)">Còn nợ 尚欠</div><div style="font-size:14px;font-weight:800;color:var(--danger)">'+fmt(Math.max(0,myUnpaid-myDeducted))+'</div></div>';
+            html+='</div>';
+        }
+        if(totalDeductedFromMe>0){
+            html+='<div style="margin-bottom:8px;padding:8px 12px;border-radius:8px;background:rgba(239,68,68,0.04);border:1px solid rgba(239,68,68,0.1)">';
+            html+='<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Đã bị khấu trừ từ LT của '+sh.name+' cho '+(otherSh?otherSh.name:'CĐ khác')+':</div>';
+            html+='<div style="font-size:15px;font-weight:800;color:var(--danger)">'+fmt(totalDeductedFromMe)+'</div>';
+            if(deductedFromMe.length>0){
+                html+='<table style="width:100%;font-size:10px;border-collapse:collapse;margin-top:6px"><thead><tr style="background:var(--bg-secondary)"><th style="padding:4px 6px;text-align:left">Ngày</th><th style="padding:4px 6px;text-align:right">Số tiền</th><th style="padding:4px 6px;text-align:left">Ghi chú</th></tr></thead><tbody>';
+                deductedFromMe.forEach(function(d){
+                    html+='<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:3px 6px">'+(d.date?formatDateVN(d.date):'—')+'</td>';
+                    html+='<td style="padding:3px 6px;text-align:right;font-weight:600;color:var(--danger)">'+fmt(d.amount||0)+'</td>';
+                    html+='<td style="padding:3px 6px;font-size:9px;color:var(--text-muted)">'+(d.notes||'—')+'</td></tr>';
+                });
+                html+='</tbody></table>';
+            }
+            html+='</div>';
+        }
+        html+='</div>';
+    }
+
     // === Tổng kết ===
     html+='<div class="card" style="padding:14px;background:linear-gradient(135deg,rgba(99,102,241,0.04),rgba(34,197,94,0.04))">';
     html+='<div style="font-weight:700;font-size:13px;margin-bottom:12px">📊 Tổng kết 總結</div>';
-    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">';
+    var totalIncome=grandTotal+totalBf;
+    var totalReceived=totalPaid+totalBfRec;
+    var totalUnreceived=(grandTotal-totalPaid)+(totalBf-totalBfRec);
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px">';
     html+='<div style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.8);text-align:center;border:1px solid rgba(99,102,241,0.15)">';
-    html+='<div style="font-size:10px;color:var(--text-muted)">Tổng thu nhập 總收入</div><div style="font-size:16px;font-weight:800;color:var(--primary)">'+fmt(totalDiv+totalBf)+'</div></div>';
+    html+='<div style="font-size:10px;color:var(--text-muted)">Tổng thu nhập 總收入</div><div style="font-size:16px;font-weight:800;color:var(--primary)">'+fmt(totalIncome)+'</div></div>';
+    if(isW){
+        html+='<div style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.8);text-align:center;border:1px solid rgba(139,92,246,0.15)">';
+        html+='<div style="font-size:10px;color:var(--text-muted)">Trong đó lương+thưởng</div><div style="font-size:14px;font-weight:800;color:var(--purple)">'+fmt(totalSalary+totalBonus)+'</div></div>';
+    }
     html+='<div style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.8);text-align:center;border:1px solid rgba(16,185,129,0.15)">';
-    html+='<div style="font-size:10px;color:var(--text-muted)">Đã nhận thực tế 已領</div><div style="font-size:16px;font-weight:800;color:var(--success)">'+fmt(totalPaid+totalBfRec)+'</div></div>';
+    html+='<div style="font-size:10px;color:var(--text-muted)">Đã nhận thực tế 已領</div><div style="font-size:16px;font-weight:800;color:var(--success)">'+fmt(totalReceived)+'</div></div>';
     html+='<div style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.8);text-align:center;border:1px solid rgba(239,68,68,0.15)">';
-    html+='<div style="font-size:10px;color:var(--text-muted)">Chưa nhận 未領</div><div style="font-size:16px;font-weight:800;color:var(--danger)">'+fmt((totalDiv-totalPaid)+(totalBf-totalBfRec))+'</div></div>';
+    html+='<div style="font-size:10px;color:var(--text-muted)">Chưa nhận 未領</div><div style="font-size:16px;font-weight:800;color:var(--danger)">'+fmt(totalUnreceived)+'</div></div>';
+    if(totalDeductedFromMe>0){
+        html+='<div style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.8);text-align:center;border:1px solid rgba(239,68,68,0.15)">';
+        html+='<div style="font-size:10px;color:var(--text-muted)">Đã bị khấu trừ 已扣除</div><div style="font-size:14px;font-weight:800;color:var(--danger)">-'+fmt(totalDeductedFromMe)+'</div></div>';
+    }
     html+='</div></div>';
 
     document.getElementById('loitucOverviewContent').innerHTML=html;
@@ -6878,7 +7152,7 @@ function renderDividendActual(){
     const now=new Date();
     const currentCumul=getCumulativeProfit(now.getFullYear(),now.getMonth()+1,null);
     const allLocks=getDividendLocks();
-    const totalPaidPrior=allLocks.filter(l=>l.id!==(lock?lock.id:'')).reduce((s,l)=>s+(l.paidTotal||calcLockTotalOutflow(l)),0);
+    const totalPaidPrior=allLocks.filter(l=>l.id!==(lock?lock.id:'')).reduce((s,l)=>s+calcLockShareholderTotal(l),0);
     const adjustedCurrentProfit=currentCumul.profit-totalPaidPrior;
     html+=`<div style="margin-bottom:14px;padding:16px 18px;border-radius:12px;border:1.5px solid rgba(99,102,241,0.3);background:linear-gradient(135deg,rgba(99,102,241,0.06),rgba(99,102,241,0.01))">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
@@ -7273,15 +7547,45 @@ function downloadShareholderPDF(shId){
     });
 
     // Benefit history
+    const cats=gs(SK.benefits)||[];
+    const catMap={};cats.forEach(c=>{catMap[c.id]=c.name});
     let bfHtml='';let totalBf=0,totalBfRec=0;
     entries.forEach(e=>{
         totalBf+=e.amount||0;
         if(e.status==='received') totalBfRec+=e.amount||0;
         bfHtml+=`<tr><td style="padding:6px 10px;border:1px solid #ddd">${e.date||'—'}</td>
-            <td style="padding:6px 10px;border:1px solid #ddd">${e.catName||'—'}</td>
+            <td style="padding:6px 10px;border:1px solid #ddd">${catMap[e.benefitId]||e.catName||'—'}</td>
             <td style="text-align:right;padding:6px 10px;border:1px solid #ddd">${fmtNum(e.amount||0)}</td>
             <td style="text-align:center;padding:6px 10px;border:1px solid #ddd">${e.status==='received'?'✅ Đã nhận':'⏳ Chưa'}</td></tr>`;
     });
+
+    // Deduction history
+    const deductions=gs(SK.benefitDeductions)||[];
+    const myUnpaid=totalBf-totalBfRec;
+    const myDeducted=deductions.filter(d=>d.forShId===shId).reduce((s,d)=>s+(d.amount||0),0);
+    const deductedFromMe=deductions.filter(d=>d.fromShId===shId);
+    const totalDeductedFromMe=deductedFromMe.reduce((s,d)=>s+(d.amount||0),0);
+    let dedHtml='';
+    if(deductedFromMe.length>0){
+        deductedFromMe.forEach(d=>{
+            const forSh=shs.find(s=>s.id===d.forShId);
+            dedHtml+=`<tr><td style="padding:6px 10px;border:1px solid #ddd">${d.date||'—'}</td>
+                <td style="padding:6px 10px;border:1px solid #ddd">${forSh?forSh.name:'—'}</td>
+                <td style="text-align:right;padding:6px 10px;border:1px solid #ddd">${fmtNum(d.amount||0)}</td>
+                <td style="padding:6px 10px;border:1px solid #ddd;font-size:10px">${d.notes||'—'}</td></tr>`;
+        });
+    }
+    const forMeDeductions=deductions.filter(d=>d.forShId===shId);
+    let dedForMeHtml='';
+    if(forMeDeductions.length>0){
+        forMeDeductions.forEach(d=>{
+            const fromSh=shs.find(s=>s.id===d.fromShId);
+            dedForMeHtml+=`<tr><td style="padding:6px 10px;border:1px solid #ddd">${d.date||'—'}</td>
+                <td style="padding:6px 10px;border:1px solid #ddd">${fromSh?fromSh.name:'—'}</td>
+                <td style="text-align:right;padding:6px 10px;border:1px solid #ddd">${fmtNum(d.amount||0)}</td>
+                <td style="padding:6px 10px;border:1px solid #ddd;font-size:10px">${d.notes||'—'}</td></tr>`;
+        });
+    }
 
     const pdfHtml=`<!DOCTYPE html><html><head><meta charset="utf-8">
 <title>Báo cáo cổ đông ${sh.name} - Quách Gia</title>
@@ -7337,6 +7641,10 @@ ${isW?'<div class="summary-item"><div class="s-label">Tổng lương 薪資總�
 <thead><tr><th>Ngày 日期</th><th>Hạng mục 項目</th><th style="text-align:right">Số tiền 金額</th><th style="text-align:center">Trạng thái 狀態</th></tr></thead>
 <tbody>${bfHtml||'<tr><td colspan="4" style="text-align:center;padding:12px;color:#999;border:1px solid #ddd">Chưa có dữ liệu</td></tr>'}</tbody>
 </table>
+${myUnpaid>0?'<div style="margin:12px 0;padding:10px;background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;font-size:11px"><strong>Phúc lợi chưa nhận 未領福利:</strong> '+fmtNum(myUnpaid)+' ₫ — Đã khấu trừ 已扣: '+fmtNum(myDeducted)+' ₫ — Còn nợ 尚欠: '+fmtNum(Math.max(0,myUnpaid-myDeducted))+' ₫</div>':''}
+${(dedHtml||dedForMeHtml)?'<h2>III. Khấu trừ phúc lợi 福利扣除</h2>':''}
+${totalDeductedFromMe>0?'<p style="font-size:11px;color:#666">Đã bị khấu trừ từ lợi tức 從分紅扣除: <strong style="color:#ef4444">'+fmtNum(totalDeductedFromMe)+' ₫</strong></p><table><thead><tr><th>Ngày</th><th>Cho CĐ</th><th style="text-align:right">Số tiền</th><th>Ghi chú</th></tr></thead><tbody>'+dedHtml+'</tbody></table>':''}
+${myDeducted>0&&forMeDeductions.length>0?'<p style="font-size:11px;color:#666">Đã được khấu trừ cho PL của '+sh.name+' 已為'+sh.name+'扣除: <strong style="color:#10b981">'+fmtNum(myDeducted)+' ₫</strong></p><table><thead><tr><th>Ngày</th><th>Từ CĐ</th><th style="text-align:right">Số tiền</th><th>Ghi chú</th></tr></thead><tbody>'+dedForMeHtml+'</tbody></table>':''}
 
 <div class="sign-area">
 <div class="sign-box"><div class="label">Người lập 制表人</div><div class="line">Ký tên, ghi rõ họ tên</div></div>
