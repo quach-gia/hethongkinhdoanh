@@ -7033,7 +7033,7 @@ function lockDividend(){
     const cumul=getCumulativeProfit(now.getFullYear(),now.getMonth()+1,null);
     const settings=getDividendSettings();
     // Subtract previously paid dividends from cumulative profit
-    const totalPaidOut=locks.reduce((s,l)=>s+(l.paidTotal||calcLockTotalOutflow(l)),0);
+    const totalPaidOut=locks.reduce((s,l)=>s+calcLockShareholderTotal(l),0);
     const adjustedProfit=cumul.profit-totalPaidOut;
     locks.push({
         id:Date.now().toString(), year:y, month:m, lockedAt:new Date().toISOString(),
